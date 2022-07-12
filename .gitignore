@@ -1,0 +1,4 @@
+.venv/
+build/
+dist/
+nlib3.egg-info/
