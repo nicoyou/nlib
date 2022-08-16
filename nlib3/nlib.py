@@ -3,6 +3,7 @@ import datetime				# 日付
 import enum					# 列挙子
 import inspect				# 活動中のオブジェクトの情報を取得する ( エラー位置 )
 import json					# JSONファイルを扱う
+import math
 import os					# osの情報
 import platform				# OS情報
 import re					# 正規表現
@@ -48,20 +49,123 @@ class Vector2():
 		self.y = y
 		return
 
+	def max(self) -> Union[int, float]:
+		"""x と y のうち大きい方の値を取得する
+
+		Returns:
+			x か y の値
+		"""
+		return self.x if self.x >= self.y else self.y
+	def min(self) -> Union[int, float]:
+		"""x と y のうち小さい方の値を取得する
+
+		Returns:
+			x か y の値
+		"""
+		return self.x if self.x <= self.y else self.y
+	def floor(self) -> Any:			# __class__ 未対応のため Any
+		"""小数点以下を切り捨てる
+
+		Returns:
+			x, y の小数点以下を切り捨てた Vector2
+		"""
+		return self.__class__(math.floor(self.x), math.floor(self.y))
+	def ceil(self) -> Any:
+		"""小数点以下を切り上げる
+
+		Returns:
+			x, y の小数点以下を切り上げた Vector2
+		"""
+		return self.__class__(math.ceil(self.x), math.ceil(self.y))
+
+	def to_self_type(self, x: Any) -> Any:
+		"""自クラス型以外の値を自クラス型へ変換する
+
+		Args:
+			x: 自クラス型か数値
+
+		Returns:
+			自クラス型の値
+		"""
+		if isinstance(x, self.__class__):
+			return x
+		else:
+			return self.__class__(x, x)
+
 	def __str__(self):
 		return "x={}, y={}".format(self.x, self.y)
 	def __repr__(self):
 		return self.__str__()
 	def __bool__(self):
 		return (bool(self.x) or bool(self.y))
+
+	# 比較演算子
 	def __eq__(self, other):
-		if isinstance(other, self.__class__):
-			return (self.x == other.x and self.y == other.y)
-		else:
-			kls = other.__class__.__name__
-			raise NotImplementedError(f"comparison between Vector2 and {kls} is not supported")
+		other = self.to_self_type(other)
+		return (self.x == other.x and self.y == other.y)
 	def __ne__(self, other):
 		return not self.__eq__(other)
+	def __lt__(self, other):
+		other = self.to_self_type(other)
+		return (self.x < other.x and self.y < other.y)
+	def __gt__(self, other):
+		other = self.to_self_type(other)
+		return (self.x > other.x and self.y > other.y)
+
+	# 算術演算子
+	def __add__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x + other.x, self.y + other.y)
+	def __sub__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x - other.x, self.y - other.y)
+	def __mul__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x * other.x, self.y * other.y)
+	def __truediv__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x / other.x, self.y / other.y)
+	def __floordiv__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x // other.x, self.y // other.y)
+	def __mod__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x % other.x, self.y % other.y)
+	def __pow__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x ** other.x, self.y ** other.y)
+
+	# 算術演算子 (右辺)
+	def __radd__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x + self.x, other.y + self.y)
+	def __rsub__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x - self.x, other.y - self.y)
+	def __rmul__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x * self.x, other.y * self.y)
+	def __rtruediv__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x / self.x, other.y / self.y)
+	def __rfloordiv__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x // self.x, other.y // self.y)
+	def __rmod__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x % self.x, other.y % self.y)
+	def __rpow__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x ** self.x, other.y ** self.y)
+
+	# 単項演算子
+	def __neg__(self):
+		return self.__class__(-self.x, -self.y)
+	def __pos__(self):
+		return self.__class__(+self.x, +self.y)
+	def __invert__(self):
+		return self.__class__(~self.x, ~self.y)
+
 	def __len__(self):
 		return 2
 	def __getitem__(self, index):
