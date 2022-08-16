@@ -1,19 +1,20 @@
-import base64				# base64の変換を行う
-import datetime				# 日付
-import enum					# 列挙子
-import inspect				# 活動中のオブジェクトの情報を取得する ( エラー位置 )
-import json					# JSONファイルを扱う
-import os					# osの情報
-import platform				# OS情報
-import re					# 正規表現
-import subprocess			# 外部プログラム実行用
-import sys					# Pythonバージョン
-import threading			# マルチスレッド
-import time					# sleepなどの時間系
-import traceback			# スタックトレースの取得
-import urllib.error			# urllibのエラー定義
-import urllib.request		# urlを扱うモジュール
-from typing import Any, Union, Callable
+import base64
+import datetime
+import enum
+import inspect
+import json
+import math
+import os
+import platform
+import re
+import subprocess
+import sys
+import threading
+import time
+import traceback
+import urllib.error
+import urllib.request
+from typing import Any, Callable, TypeAlias
 
 OUTPUT_DIR = "./data"								# 情報を出力する際のディレクトリ
 LOG_PATH = OUTPUT_DIR + "/lib.log"					# ログのファイルパス
@@ -21,7 +22,8 @@ ERROR_LOG_PATH = OUTPUT_DIR + "/error.log"			# エラーログのファイルパ
 DISPLAY_DEBUG_LOG_FLAG = True						# デバッグログを出力するかどうか
 DEFAULT_ENCODING = "utf-8"							# ファイルIO時の標準エンコード
 
-JsonValue = Union[int, float, bool, str]
+Number: TypeAlias = int | float
+JsonValue: TypeAlias = int | float | bool | str
 
 class LibErrorCode(enum.Enum):
 	"""ライブラリ内の一部関数で返されるエラーコード
@@ -37,16 +39,83 @@ class Vector2():
 	""" ２次元ベクトルの値を格納するためのクラス
 	Vector2.x と Vector2.y か Vector2[0] と Vector2[1] でそれぞれの値にアクセスできる
 	"""
-	def __init__(self, x: Union[int, float] = 0, y: Union[int, float] = 0) -> None:
-		"""それぞれの値を初期化する、値を指定しなかった場合は０で初期化される
+	def __init__(self, x: Number = 0, y: Number = 0) -> None:
+		"""それぞれの値を初期化する、値を指定しなかった場合は 0 で初期化される
+		x に Vector2 クラスをそのまま渡せば、その Vector2 の値で初期化される
+		x にリストやタプルを渡した場合は、一つ目の要素が x 二つ目の要素が y となる
 
 		Args:
 			x: 数値を指定する
 			y: 数値を指定する
 		"""
+		if isinstance(x, self.__class__) and y == 0:
+			self.x = x.x
+			self.y = x.y
+			return
+		if (type(x) in [tuple, list] and len(x) == 2) and y == 0:
+			self.x = x[0]
+			self.y = x[1]
+			return
 		self.x = x
 		self.y = y
 		return
+
+	def max(self) -> Number:
+		"""x と y のうち大きい方の値を取得する
+
+		Returns:
+			x か y の値
+		"""
+		return self.x if self.x >= self.y else self.y
+	def min(self) -> Number:
+		"""x と y のうち小さい方の値を取得する
+
+		Returns:
+			x か y の値
+		"""
+		return self.x if self.x <= self.y else self.y
+	def round(self) -> Any:			# __class__ 未対応のため Any
+		"""x と y それぞれの小数点以下を丸める
+
+		Returns:
+			x, y の小数点以下を丸めた Vector2
+		"""
+		return self.__class__(round(self.x), round(self.y))
+	def floor(self) -> Any:
+		"""x と y それぞれの小数点以下を切り捨てる
+
+		Returns:
+			x, y の小数点以下を切り捨てた Vector2
+		"""
+		return self.__class__(math.floor(self.x), math.floor(self.y))
+	def ceil(self) -> Any:
+		"""x と y それぞれの小数点以下を切り上げる
+
+		Returns:
+			x, y の小数点以下を切り上げた Vector2
+		"""
+		return self.__class__(math.ceil(self.x), math.ceil(self.y))
+	def invert(self) -> Any:
+		"""x と y の値を入れ替える
+
+		Returns:
+			x, y の値を入れ替えた Vector2
+		"""
+		return self.__class__(self.y, self.x)
+
+	def to_self_type(self, x: Any) -> Any:
+		"""自クラス型以外の値を自クラス型へ変換する
+
+		Args:
+			x: 自クラス型か数値
+
+		Returns:
+			自クラス型の値
+		"""
+		if isinstance(x, self.__class__):
+			return x
+		else:
+			return self.__class__(x, x)
 
 	def __str__(self):
 		return "x={}, y={}".format(self.x, self.y)
@@ -54,14 +123,74 @@ class Vector2():
 		return self.__str__()
 	def __bool__(self):
 		return (bool(self.x) or bool(self.y))
+
+	# 比較演算子
 	def __eq__(self, other):
-		if isinstance(other, self.__class__):
-			return (self.x == other.x and self.y == other.y)
-		else:
-			kls = other.__class__.__name__
-			raise NotImplementedError(f"comparison between Vector2 and {kls} is not supported")
+		other = self.to_self_type(other)
+		return (self.x == other.x and self.y == other.y)
 	def __ne__(self, other):
 		return not self.__eq__(other)
+	def __lt__(self, other):
+		other = self.to_self_type(other)
+		return (self.x < other.x and self.y < other.y)
+	def __gt__(self, other):
+		other = self.to_self_type(other)
+		return (self.x > other.x and self.y > other.y)
+
+	# 算術演算子
+	def __add__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x + other.x, self.y + other.y)
+	def __sub__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x - other.x, self.y - other.y)
+	def __mul__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x * other.x, self.y * other.y)
+	def __truediv__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x / other.x, self.y / other.y)
+	def __floordiv__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x // other.x, self.y // other.y)
+	def __mod__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x % other.x, self.y % other.y)
+	def __pow__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(self.x ** other.x, self.y ** other.y)
+
+	# 算術演算子 (右辺)
+	def __radd__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x + self.x, other.y + self.y)
+	def __rsub__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x - self.x, other.y - self.y)
+	def __rmul__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x * self.x, other.y * self.y)
+	def __rtruediv__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x / self.x, other.y / self.y)
+	def __rfloordiv__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x // self.x, other.y // self.y)
+	def __rmod__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x % self.x, other.y % self.y)
+	def __rpow__(self, other):
+		other = self.to_self_type(other)
+		return self.__class__(other.x ** self.x, other.y ** self.y)
+
+	# 単項演算子
+	def __neg__(self):
+		return self.__class__(-self.x, -self.y)
+	def __pos__(self):
+		return self.__class__(+self.x, +self.y)
+	def __invert__(self):
+		return self.__class__(~self.x, ~self.y)
+
 	def __len__(self):
 		return 2
 	def __getitem__(self, index):
@@ -74,7 +203,7 @@ class Vector2():
 class JsonData():
 	""" Jsonファイルから一つの値を読み込んで保持するクラス
 	"""
-	def __init__(self, keys: Union[str, list, tuple], default: JsonValue, path: str) -> None:
+	def __init__(self, keys: str | list | tuple, default: JsonValue, path: str) -> None:
 		"""Jsonファイルから読み込む値を指定する
 
 		Args:
@@ -201,7 +330,7 @@ class JsonData():
 		return self.default
 
 	@staticmethod
-	def dumps(json_data: Union[str, dict]) -> str:
+	def dumps(json_data: str | dict) -> str:
 		"""Jsonファイルか辞書を整形されたJson形式の文字列に変換する
 
 		Args:
@@ -368,7 +497,7 @@ def save_json(file_path: str, obj: Any, ensure_ascii: bool = False) -> None:
 		json.dump(obj, f, indent=4, ensure_ascii=ensure_ascii)
 	return
 
-def update_nest_dict(dictionary: dict, keys: Union[object, list, tuple], value: object) -> bool:
+def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: object) -> bool:
 	"""ネストされた辞書内の特定の値のみを再帰で変更する関数
 
 	Args:
@@ -522,7 +651,7 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
 	return file_path
 
 # JANコードのチェックデジットを計算して取得する
-def get_check_digit(jan_code: Union[int, str]) -> int:
+def get_check_digit(jan_code: int | str) -> int:
 	"""JANコードのチェックデジットを計算して取得する
 
 	Args:
@@ -584,7 +713,7 @@ def imput_while(str_info: str, branch: Callable[[str], bool] = lambda in_str : i
 			print("\n不正な値が入力されました、再度入力して下さい")
 	return ""
 
-def get_datatime_now(to_str: bool = False) -> Union[datetime.datetime, str]:
+def get_datatime_now(to_str: bool = False) -> datetime.datetime | str:
 	"""日本の現在の datetime を取得する
 
 	Args:
