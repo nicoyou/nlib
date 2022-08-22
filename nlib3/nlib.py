@@ -1,20 +1,20 @@
-import base64				# base64の変換を行う
-import datetime				# 日付
-import enum					# 列挙子
-import inspect				# 活動中のオブジェクトの情報を取得する ( エラー位置 )
-import json					# JSONファイルを扱う
+import base64
+import datetime
+import enum
+import inspect
+import json
 import math
-import os					# osの情報
-import platform				# OS情報
-import re					# 正規表現
-import subprocess			# 外部プログラム実行用
-import sys					# Pythonバージョン
-import threading			# マルチスレッド
-import time					# sleepなどの時間系
-import traceback			# スタックトレースの取得
-import urllib.error			# urllibのエラー定義
-import urllib.request		# urlを扱うモジュール
-from typing import Any, Union, Callable
+import os
+import platform
+import re
+import subprocess
+import sys
+import threading
+import time
+import traceback
+import urllib.error
+import urllib.request
+from typing import Any, Callable, TypeAlias
 
 OUTPUT_DIR = "./data"								# 情報を出力する際のディレクトリ
 LOG_PATH = OUTPUT_DIR + "/lib.log"					# ログのファイルパス
@@ -22,7 +22,8 @@ ERROR_LOG_PATH = OUTPUT_DIR + "/error.log"			# エラーログのファイルパ
 DISPLAY_DEBUG_LOG_FLAG = True						# デバッグログを出力するかどうか
 DEFAULT_ENCODING = "utf-8"							# ファイルIO時の標準エンコード
 
-JsonValue = Union[int, float, bool, str]
+Number: TypeAlias = int | float
+JsonValue: TypeAlias = int | float | bool | str
 
 class LibErrorCode(enum.Enum):
 	"""ライブラリ内の一部関数で返されるエラーコード
@@ -38,7 +39,7 @@ class Vector2():
 	""" ２次元ベクトルの値を格納するためのクラス
 	Vector2.x と Vector2.y か Vector2[0] と Vector2[1] でそれぞれの値にアクセスできる
 	"""
-	def __init__(self, x: Union[int, float] = 0, y: Union[int, float] = 0) -> None:
+	def __init__(self, x: Number = 0, y: Number = 0) -> None:
 		"""それぞれの値を初期化する、値を指定しなかった場合は０で初期化される
 
 		Args:
@@ -49,14 +50,14 @@ class Vector2():
 		self.y = y
 		return
 
-	def max(self) -> Union[int, float]:
+	def max(self) -> Number:
 		"""x と y のうち大きい方の値を取得する
 
 		Returns:
 			x か y の値
 		"""
 		return self.x if self.x >= self.y else self.y
-	def min(self) -> Union[int, float]:
+	def min(self) -> Number:
 		"""x と y のうち小さい方の値を取得する
 
 		Returns:
@@ -178,7 +179,7 @@ class Vector2():
 class JsonData():
 	""" Jsonファイルから一つの値を読み込んで保持するクラス
 	"""
-	def __init__(self, keys: Union[str, list, tuple], default: JsonValue, path: str) -> None:
+	def __init__(self, keys: str | list | tuple, default: JsonValue, path: str) -> None:
 		"""Jsonファイルから読み込む値を指定する
 
 		Args:
@@ -305,7 +306,7 @@ class JsonData():
 		return self.default
 
 	@staticmethod
-	def dumps(json_data: Union[str, dict]) -> str:
+	def dumps(json_data: str | dict) -> str:
 		"""Jsonファイルか辞書を整形されたJson形式の文字列に変換する
 
 		Args:
@@ -472,7 +473,7 @@ def save_json(file_path: str, obj: Any, ensure_ascii: bool = False) -> None:
 		json.dump(obj, f, indent=4, ensure_ascii=ensure_ascii)
 	return
 
-def update_nest_dict(dictionary: dict, keys: Union[object, list, tuple], value: object) -> bool:
+def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: object) -> bool:
 	"""ネストされた辞書内の特定の値のみを再帰で変更する関数
 
 	Args:
@@ -626,7 +627,7 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
 	return file_path
 
 # JANコードのチェックデジットを計算して取得する
-def get_check_digit(jan_code: Union[int, str]) -> int:
+def get_check_digit(jan_code: int | str) -> int:
 	"""JANコードのチェックデジットを計算して取得する
 
 	Args:
@@ -688,7 +689,7 @@ def imput_while(str_info: str, branch: Callable[[str], bool] = lambda in_str : i
 			print("\n不正な値が入力されました、再度入力して下さい")
 	return ""
 
-def get_datatime_now(to_str: bool = False) -> Union[datetime.datetime, str]:
+def get_datatime_now(to_str: bool = False) -> datetime.datetime | str:
 	"""日本の現在の datetime を取得する
 
 	Args:

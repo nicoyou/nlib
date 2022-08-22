@@ -39,15 +39,17 @@ setuptools.setup(
 
 	url=url,						# パッケージに関連するサイトのURL ( GitHubなど )
 
-	description="You can use a slightly useful function.",		# パッケージの簡単な説明
-	long_description=long_description,							# PyPIに"Project description"として表示されるパッケージの説明文
-	long_description_content_type="text/markdown",				# long_descriptionの形式を"text/plain", "text/x-rst", "text/markdown"のいずれかから指定
-	keywords=f"{package_name} nlib nicoyou_lib nicoyou",		# PyPIでの検索用キーワードをスペース区切りで指定
+	description="You can use a slightly useful function.",				# パッケージの簡単な説明
+	long_description=long_description,									# PyPIに"Project description"として表示されるパッケージの説明文
+	long_description_content_type="text/markdown",						# long_descriptionの形式を"text/plain", "text/x-rst", "text/markdown"のいずれかから指定
+	keywords=f"{package_name} nlib library nicoyou_lib nicoyou",		# PyPIでの検索用キーワードをスペース区切りで指定
 
 	classifiers=[
 		"Programming Language :: Python",
+		"Programming Language :: Python :: 3",
 		"Programming Language :: Python :: 3 :: Only",
-		"Programming Language :: Python :: 3.9",
 		"Programming Language :: Python :: 3.10",
+		"Programming Language :: Python :: 3.11",
+		"Programming Language :: Python :: 3.12",
 	],							# パッケージ(プロジェクト)の分類 ( https://pypi.org/classifiers/ )
 )
