@@ -64,20 +64,34 @@ class Vector2():
 			x か y の値
 		"""
 		return self.x if self.x <= self.y else self.y
-	def floor(self) -> Any:			# __class__ 未対応のため Any
-		"""小数点以下を切り捨てる
+	def round(self) -> Any:			# __class__ 未対応のため Any
+		"""x と y それぞれの小数点以下を丸める
+
+		Returns:
+			x, y の小数点以下を丸めた Vector2
+		"""
+		return self.__class__(round(self.x), round(self.y))
+	def floor(self) -> Any:
+		"""x と y それぞれの小数点以下を切り捨てる
 
 		Returns:
 			x, y の小数点以下を切り捨てた Vector2
 		"""
 		return self.__class__(math.floor(self.x), math.floor(self.y))
 	def ceil(self) -> Any:
-		"""小数点以下を切り上げる
+		"""x と y それぞれの小数点以下を切り上げる
 
 		Returns:
 			x, y の小数点以下を切り上げた Vector2
 		"""
 		return self.__class__(math.ceil(self.x), math.ceil(self.y))
+	def invert(self) -> Any:
+		"""x と y の値を入れ替える
+
+		Returns:
+			x, y の値を入れ替えた Vector2
+		"""
+		return self.__class__(self.y, self.x)
 
 	def to_self_type(self, x: Any) -> Any:
 		"""自クラス型以外の値を自クラス型へ変換する
