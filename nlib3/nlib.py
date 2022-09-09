@@ -40,12 +40,22 @@ class Vector2():
 	Vector2.x と Vector2.y か Vector2[0] と Vector2[1] でそれぞれの値にアクセスできる
 	"""
 	def __init__(self, x: Number = 0, y: Number = 0) -> None:
-		"""それぞれの値を初期化する、値を指定しなかった場合は０で初期化される
+		"""それぞれの値を初期化する、値を指定しなかった場合は 0 で初期化される
+		x に Vector2 クラスをそのまま渡せば、その Vector2 の値で初期化される
+		x にリストやタプルを渡した場合は、一つ目の要素が x 二つ目の要素が y となる
 
 		Args:
 			x: 数値を指定する
 			y: 数値を指定する
 		"""
+		if isinstance(x, self.__class__) and y == 0:
+			self.x = x.x
+			self.y = x.y
+			return
+		if (type(x) in [tuple, list] and len(x) == 2) and y == 0:
+			self.x = x[0]
+			self.y = x[1]
+			return
 		self.x = x
 		self.y = y
 		return
