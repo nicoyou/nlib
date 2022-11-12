@@ -14,7 +14,7 @@ import time
 import traceback
 import urllib.error
 import urllib.request
-from typing import Any, Callable, TypeAlias
+from typing import Any, Callable, TypeAlias, Final
 
 OUTPUT_DIR = "./data"                       # 情報を出力する際のディレクトリ
 LOG_PATH = OUTPUT_DIR + "/lib.log"          # ログのファイルパス
@@ -391,6 +391,76 @@ class JsonData():
 
         data_str = json.dumps(data, indent=4, ensure_ascii=False)
         return data_str
+
+
+class Url():
+    """URLを格納するクラス
+    """
+    def __init__(self, url: str, param: str = "") -> None:
+        self.url = url
+        self.param = param
+        self.SCHEME_END: Final[str] = "://"
+        return
+
+    @property
+    def name(self) -> str:
+        """urlの末尾を取得する
+
+        Returns:
+            urlの末尾
+        """
+        return self.url.split("/")[-1]
+
+    @property
+    def parent(self) -> Any:
+        """現在のurlの上位urlを取得する
+
+        Raises:
+            ValueError: 不正なurlを指定した場合に発生
+
+        Returns:
+            現在のurlの上位url
+        """
+        if len(self.url.split(self.SCHEME_END)) != 2:
+            raise ValueError("正しいURLではありません")
+        tmp = self.url.split(self.SCHEME_END)
+        return self.__class__(tmp[0] + (self.SCHEME_END) + ("/").join(tmp[1].split("/")[:-1]))
+
+    def with_name(self, name: str) -> Any:
+        """urlのname属性を引数に与えた名前に変換したurlを取得
+
+        Args:
+            name: path名
+
+        Returns:
+            名前に変換したurl
+        """
+        return self.parent / name
+
+    def add_param(self, key: str, value: str | int | float) -> Any:
+        """パラメータを追加する
+
+        Args:
+            key: パラメータのキー
+            value: 値
+
+        Returns:
+            パラメータを追加した URL オブジェクト
+        """
+        return self.__class__(self.url, self.param + "&" + key + "=" + str(value))
+
+    def __truediv__(self, other: str) -> Any:
+        if other[0] == "/":
+            other = other[1:]
+        return self.__class__(self.url + "/" + other, self.param)
+
+    def __str__(self) -> str:
+        if self.param:
+            return self.url + "?" + self.param[1:]
+        return self.url
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 def thread(func: Callable) -> Callable:
