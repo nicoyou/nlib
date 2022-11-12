@@ -50,17 +50,31 @@ class Vector2():
             x: 数値を指定する
             y: 数値を指定する
         """
+        self.x = 0
+        self.y = 0
+        self.set(x, y)
+        return
+
+    def set(self, x: Number, y: Number = 0) -> Any:
+        """それぞれの値を初期化する、値を指定しなかった場合は 0 で初期化される
+        x に Vector2 クラスをそのまま渡せば、その Vector2 の値で初期化される
+        x にリストやタプルを渡した場合は、一つ目の要素が x 二つ目の要素が y となる
+
+        Args:
+            x: 数値を指定する
+            y: 数値を指定する
+        """
         if isinstance(x, self.__class__) and y == 0:
             self.x = x.x
             self.y = x.y
-            return
+            return self
         if (type(x) in [tuple, list] and len(x) == 2) and y == 0:
             self.x = x[0]
             self.y = x[1]
-            return
+            return self
         self.x = x
         self.y = y
-        return
+        return self
 
     def max(self) -> Number:
         """x と y のうち大きい方の値を取得する
