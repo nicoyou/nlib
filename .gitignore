@@ -1,4 +1,8 @@
-.venv/
-build/
-dist/
-nlib3.egg-info/
+/.venv/
+/.vscode/
+
+/build/
+/dist/
+/nlib3.egg-info/
+
+/data/

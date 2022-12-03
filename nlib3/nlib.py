@@ -14,16 +14,23 @@ import time
 import traceback
 import urllib.error
 import urllib.request
-from typing import Any, Callable, TypeAlias, Final
+from pathlib import Path
+from typing import Any, Callable, Final, TypeAlias, overload
 
-OUTPUT_DIR = "./data"                       # 情報を出力する際のディレクトリ
-LOG_PATH = OUTPUT_DIR + "/lib.log"          # ログのファイルパス
-ERROR_LOG_PATH = OUTPUT_DIR + "/error.log"  # エラーログのファイルパス
-DISPLAY_DEBUG_LOG_FLAG = True               # デバッグログを出力するかどうか
-DEFAULT_ENCODING = "utf-8"                  # ファイルIO時の標準エンコード
+OUTPUT_DIR: Final[Path] = Path("./data")                # 情報を出力する際のディレクトリ
+LOG_PATH: Final[Path] = OUTPUT_DIR / "lib.log"          # ログのファイルパス
+ERROR_LOG_PATH: Final[Path] = OUTPUT_DIR / "error.log"  # エラーログのファイルパス
+DISPLAY_DEBUG_LOG_FLAG: Final[bool] = True              # デバッグログを出力するかどうか
+DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイルIO時の標準エンコード
 
+# type alias
 Number: TypeAlias = int | float
-JsonValue: TypeAlias = int | float | bool | str
+JsonValue: TypeAlias = int | float | bool | str | None
+
+IntList: TypeAlias = list[int] | tuple[int, ...]
+FloatList: TypeAlias = list[float] | tuple[float, ...]
+BoolList: TypeAlias = list[bool] | tuple[bool, ...]
+StrList: TypeAlias = list[str] | tuple[str, ...]
 
 
 class LibErrorCode(enum.Enum):
@@ -41,7 +48,7 @@ class Vector2():
     """ ２次元ベクトルの値を格納するためのクラス
     Vector2.x と Vector2.y か Vector2[0] と Vector2[1] でそれぞれの値にアクセスできる
     """
-    def __init__(self, x: Number = 0, y: Number = 0) -> None:
+    def __init__(self, x: Number | tuple[Number, Number] | list[Number] = 0, y: Number = 0) -> None:
         """それぞれの値を初期化する、値を指定しなかった場合は 0 で初期化される
         x に Vector2 クラスをそのまま渡せば、その Vector2 の値で初期化される
         x にリストやタプルを渡した場合は、一つ目の要素が x 二つ目の要素が y となる
@@ -50,12 +57,12 @@ class Vector2():
             x: 数値を指定する
             y: 数値を指定する
         """
-        self.x = 0
-        self.y = 0
+        self.x: Number = 0
+        self.y: Number = 0
         self.set(x, y)
         return
 
-    def set(self, x: Number, y: Number = 0) -> Any:
+    def set(self, x: Number | tuple[Number, Number] | list[Number], y: Number = 0) -> Any:
         """それぞれの値を初期化する、値を指定しなかった場合は 0 で初期化される
         x に Vector2 クラスをそのまま渡せば、その Vector2 の値で初期化される
         x にリストやタプルを渡した場合は、一つ目の要素が x 二つ目の要素が y となる
@@ -138,13 +145,13 @@ class Vector2():
         else:
             return self.__class__(x, x)
 
-    def __str__(self):
-        return "x={}, y={}".format(self.x, self.y)
+    def __str__(self) -> str:
+        return f"x={self.x}, y={self.y}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return (bool(self.x) or bool(self.y))
 
     # 比較演算子
@@ -242,20 +249,27 @@ class Vector2():
         raise IndexError
 
 
+class StrEnum(str, enum.Enum):
+    """str のサブクラスでもある列挙型定数を作成する基底クラス
+    """
+    def __str__(self) -> str:
+        return str(self.value)
+
+
 class JsonData():
     """ Jsonファイルから一つの値を読み込んで保持するクラス
     """
-    def __init__(self, keys: str | list | tuple, default: JsonValue, path: str) -> None:
+    def __init__(self, keys: str | list | tuple, default: JsonValue, path: str | Path) -> None:
         """Jsonファイルから読み込む値を指定する
 
         Args:
-            keys: Jsonデータのキーを指定する (複数階層ある場合はリストで渡す)
+            keys: Jsonデータのキーを指定する ( 複数階層ある場合はリストで渡す )
             default: 値が存在しなかった場合のデフォルトの値を設定する
             path: Jsonファイルのパス
         """
         self.keys = keys
         self.default = default
-        self.path = path
+        self.path = Path(path)
         self.data = None
         self.load_error_flag = False
         self.load()
@@ -265,9 +279,8 @@ class JsonData():
         """ファイルから値を読み込む
 
         Returns:
-            bool:
-                正常に読み込めた場合か、デフォルト値で初期化した場合は True
-                何らかのエラーが発生した場合は False
+            正常に読み込めた場合か、デフォルト値で初期化した場合は True
+            何らかのエラーが発生した場合は False
         """
         try:
             json_data = load_json(self.path)
@@ -288,14 +301,14 @@ class JsonData():
         except Exception as e:
             self.data = self.default
             self.load_error_flag = True
-            print_error_log("jsonファイルの読み込みに失敗しました [keys={}]\n{}".format(self.keys, e))
+            print_error_log(f"jsonファイルの読み込みに失敗しました [keys={self.keys}]\n{e}")
         return False
 
     def save(self) -> bool:
         """ファイルに現在保持している値を保存する
 
         Returns:
-            bool: ファイルへの保存が成功した場合は True
+            ファイルへの保存が成功した場合は True
         """
         if self.load_error_flag:
             print_error_log("データの読み込みに失敗しているため、上書き保存をスキップしました")
@@ -304,18 +317,18 @@ class JsonData():
         try:
             json_data = load_json(self.path)
         except FileNotFoundError as e:              # ファイルが見つからなかった場合は
-            print_log("jsonファイルが見つからなかったため、新規生成します [keys={}]\n{}".format(self.keys, e))
+            print_log(f"jsonファイルが見つからなかったため、新規生成します [keys={self.keys}]\n{e}")
         except json.decoder.JSONDecodeError as e:   # JSONの文法エラーがあった場合は新たに上書き保存する
-            print_log("jsonファイルが壊れている為、再生成します [keys={}]\n{}".format(self.keys, e))
+            print_log(f"jsonファイルが壊れている為、再生成します [keys={self.keys}]\n{e}")
         except Exception as e:                      # 不明なエラーが起きた場合は上書きせず終了する
-            print_error_log("jsonファイルへのデータの保存に失敗しました [keys={}]\n{}".format(self.keys, e))
+            print_error_log(f"jsonファイルへのデータの保存に失敗しました [keys={self.keys}]\n{e}")
             return False
         try:
             update_nest_dict(json_data, self.keys, self.data)
             save_json(self.path, json_data)
             return True
         except Exception as e:
-            print_error_log("jsonへの出力に失敗しました [keys={}]\n{}".format(self.keys, e))
+            print_error_log(f"jsonへの出力に失敗しました [keys={self.keys}]\n{e}")
         return False
 
     def increment(self, save_flag: bool = False, num: int = 1) -> bool:
@@ -326,17 +339,18 @@ class JsonData():
             num: 増加させる値を指定する
 
         Returns:
-            bool: データがファイルに保存されれば True
+            データがファイルに保存されれば True
         """
         if not can_cast(self.get(), int):                   # int型に変換できない場合は初期化する
+            print_error_log(f"使用できない値を初期化します [keys={self.keys}, value={self.get()}]")
             self.set(0)
         return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
 
-    def get(self) -> JsonValue:
+    def get(self) -> JsonValue | None:
         """現在保持している値を取得する
 
         Returns:
-            JsonValue: 保持している値
+            保持している値
         """
         return self.data
 
@@ -348,7 +362,7 @@ class JsonData():
             save_flag: ファイルに新しい値を保存するかどうか
 
         Returns:
-            bool: データがファイルに保存されれば True
+            データがファイルに保存されれば True
         """
         self.data = data
         if save_flag:
@@ -359,7 +373,7 @@ class JsonData():
         """Jsonファイルのこの値が保存されているキーを取得する
 
         Returns:
-            tuple: 値にたどり着くまでのキー
+            値にたどり着くまでのキー
         """
         return tuple(self.keys)
 
@@ -367,30 +381,23 @@ class JsonData():
         """設定されているデフォルト値を取得する
 
         Returns:
-            JsonValue: ファイルに値が存在しなかった時に使用するデフォルト値
+            ファイルに値が存在しなかった時に使用するデフォルト値
         """
         return self.default
 
-    @staticmethod
-    def dumps(json_data: str | dict) -> str:
-        """Jsonファイルか辞書を整形されたJson形式の文字列に変換する
-
-        Args:
-            json_data: Jsonファイルのファイルパスか、出力したいデータの辞書
+    def file_exists(self) -> bool:
+        """jsonファイルが存在するかどうかを取得する
 
         Returns:
-            str: 整形されたJson形式の文字列
+            ファイルが存在すればTrue
         """
-        if type(json_data) is str:
-            data = json.loads(json_data)
-        elif type(json_data) is dict:
-            data = json_data
-        else:
-            print_error_log("JSONデータの読み込みに失敗しました")
-            return None
+        return self.path.is_file()
 
-        data_str = json.dumps(data, indent=4, ensure_ascii=False)
-        return data_str
+    def __str__(self) -> str:
+        return str(self.data)
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 class Url():
@@ -488,7 +495,7 @@ def get_error_message(code: LibErrorCode) -> str:
         code: ライブラリのエラーコード
 
     Returns:
-        str: コードに対応するエラーメッセージ
+        コードに対応するエラーメッセージ
     """
     if code == LibErrorCode.success:
         return "処理が正常に終了しました"
@@ -507,7 +514,7 @@ def get_error_message(code: LibErrorCode) -> str:
     return "不明なエラーが発生しました"
 
 
-def print_log(message: object, console_print: bool = True, error_flag: bool = False, file_name: str = "", file_path: str = "") -> bool:
+def print_log(message: object, console_print: bool = True, error_flag: bool = False, file_name: str = "", file_path: str | Path | None = None) -> bool:
     """ログをファイルに出力する
 
     Args:
@@ -518,43 +525,42 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
         file_path: 出力するファイルのパスを指定する
 
     Returns:
-        bool: 正常にファイルに出力できた場合は True
+        正常にファイルに出力できた場合は True
     """
-    log_path = LOG_PATH
+    log_path: Path = LOG_PATH
     if error_flag:  # エラーログの場合はファイルを変更する
         log_path = ERROR_LOG_PATH
     if file_name:
-        log_path = os.path.join(OUTPUT_DIR, f"{file_name}.log")
-    if file_path:
-        log_path = file_path
+        log_path = OUTPUT_DIR / f"{file_name}.log"
+    if file_path is not None:
+        log_path = Path(file_path)
     if console_print:
         print_debug(message)
     if file_name and file_path:
         raise ValueError
 
-    time_now = get_datatime_now(True)                                                   # 現在時刻を取得する
-    if not os.path.isfile(log_path) or os.path.getsize(log_path) < 1024 * 1000 * 50:    # 50MBより小さければ出力する
-        os.makedirs(OUTPUT_DIR, exist_ok=True)                                          # データを出力するディレクトリを生成する
+    time_now = get_datatime_now(True)                                           # 現在時刻を取得する
+    if not log_path.is_file() or log_path.stat().st_size < 1024 * 1000 * 50:    # 50MBより小さければ出力する
+        os.makedirs(OUTPUT_DIR, exist_ok=True)                                  # データを出力するディレクトリを生成する
         with open(log_path, mode="a", encoding=DEFAULT_ENCODING) as f:
-            if error_flag:                                                              # エラーログ
-                frame = inspect.currentframe().f_back.f_back                            # 関数が呼ばれた場所の情報を取得する
+            if error_flag:                                                      # エラーログ
+                frame = inspect.currentframe().f_back.f_back                    # 関数が呼ばれた場所の情報を取得する
                 try:
                     class_name = str(frame.f_locals["self"])
                     class_name = re.match(r'.*?__main__.(.*?) .*?', class_name)
                     if class_name is not None:
                         class_name = class_name.group(1)
-                except KeyError:                                                        # クラス名が見つからなければ
+                except KeyError:                                                # クラス名が見つからなければ
                     class_name = None
                 err_file_name = os.path.splitext(os.path.basename(frame.f_code.co_filename))[0]
 
                 code_name = ""
                 if class_name is not None:
-                    code_name = "{}.{}.{}({})".format(err_file_name, class_name, frame.f_code.co_name, frame.f_lineno)
+                    code_name = f"{err_file_name}.{class_name}.{frame.f_code.co_name}({frame.f_lineno})"
                 else:
-                    code_name = "{}.{}({})".format(err_file_name, frame.f_code.co_name, frame.f_lineno)
-                f.write("[{}] {}".format(time_now, code_name).ljust(90) + str(message).rstrip("\n").replace("\n", "\n" + "[{}]".format(time_now).ljust(90)) +
-                        "\n")                                                                                                                                 # 最後の改行文字を取り除いて文中の改行前にスペースを追加する
-            else:                                                                                                                                             # 普通のログ
+                    code_name = f"{err_file_name}.{frame.f_code.co_name}({frame.f_lineno})"
+                f.write(f"[{time_now}] {code_name}".ljust(90) + str(message).rstrip("\n").replace("\n", "\n" + f"[{time_now}]".ljust(90)) + "\n") # 最後の改行文字を取り除いて文中の改行前にスペースを追加する
+            else:                                                                                                                                 # 普通のログ
                 f.write("[{}] {}\n".format(time_now, str(message).rstrip("\n")))
             return True
     else:
@@ -570,7 +576,7 @@ def print_error_log(message: object, console_print: bool = True) -> bool:
         console_print: 内容をコンソールに出力するかどうか
 
     Returns:
-        bool: 正常にファイルに出力できた場合は True
+        正常にファイルに出力できた場合は True
     """
     return print_log(message, console_print, True)
 
@@ -583,28 +589,28 @@ def print_debug(message: object, end: str = "\n") -> bool:
         end: 最後に追加で出力される内容
 
     Returns:
-        bool: 実際にコンソールに出力された場合は True
+        実際にコンソールに出力された場合は True
     """
     if DISPLAY_DEBUG_LOG_FLAG:
         print(message, end=end)
     return DISPLAY_DEBUG_LOG_FLAG
 
 
-def load_json(file_path: str) -> Any:
+def load_json(file_path: str | Path) -> Any:
     """jsonファイルを読み込む
 
     Args:
         file_path: jsonファイルパス
 
     Returns:
-        dict: 読み込んだjsonファイルのデータ
+        読み込んだjsonファイルのデータ
     """
     with open(file_path, "r", encoding=DEFAULT_ENCODING) as f:
         obj = json.load(f)
     return obj
 
 
-def save_json(file_path: str, obj: Any, ensure_ascii: bool = False) -> None:
+def save_json(file_path: str | Path, obj: Any, ensure_ascii: bool = False) -> None:
     """データをjsonファイルに保存する
 
     Args:
@@ -617,6 +623,28 @@ def save_json(file_path: str, obj: Any, ensure_ascii: bool = False) -> None:
     return
 
 
+def json_dumps(json_data: str | dict, ensure_ascii: bool = False) -> str | None:
+    """Json文字列か辞書を整形されたJson形式の文字列に変換する
+
+    Args:
+        json_data: Jsonファイルのファイルパスか、出力したいデータの辞書
+        ensure_ascii: 非ASCII文字文字をエスケープする
+
+    Returns:
+        整形されたJson形式の文字列
+    """
+    if type(json_data) is str:
+        data = json.loads(json_data)
+    elif type(json_data) is dict:
+        data = json_data
+    else:
+        print_error_log("JSONデータの読み込みに失敗しました")
+        return None
+
+    data_str = json.dumps(data, indent=4, ensure_ascii=ensure_ascii)
+    return data_str
+
+
 def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: object) -> bool:
     """ネストされた辞書内の特定の値のみを再帰で変更する関数
 
@@ -626,7 +654,7 @@ def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: objec
         value: 上書きする値
 
     Returns:
-        bool: 再帰せずに更新した場合のみ True、再帰した場合は False
+        再帰せずに更新した場合のみ True、再帰した場合は False
     """
     if type(keys) is not list and type(keys) is not tuple:
         keys = (keys, )                                         # 渡されがキーがリストでもタプルでもなければタプルに変換する
@@ -648,7 +676,7 @@ def check_url(url: str) -> bool:
         url: 存在を確認するURL
 
     Returns:
-        bool: リンク先に正常にアクセスできた場合は True
+        リンク先に正常にアクセスできた場合は True
     """
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36"}
@@ -670,7 +698,7 @@ def download_file(url: str, dest_path: str, overwrite: bool = True) -> LibErrorC
         overwrite: 同名のファイルが存在した場合に上書きするかどうか
 
     Returns:
-        LibErrorCode: ライブラリのエラーコード
+        ライブラリのエラーコード
     """
     if not overwrite and os.path.isfile(dest_path):
         return LibErrorCode.cancel
@@ -707,7 +735,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
         trial_interval: ダウンロード再試行までのクールタイム
 
     Returns:
-        LibErrorCode: ライブラリのエラーコード
+        ライブラリのエラーコード
     """
     result = download_file(url, dest_path, overwrite)
     if result in [LibErrorCode.cancel, LibErrorCode.argument, LibErrorCode.file_not_found]:     # 既にファイルが存在した場合と引数が間違えている場合は処理を終了する
@@ -724,7 +752,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
     return LibErrorCode.unknown
 
 
-def read_tail(path: str, n: int, encoding: bool = None) -> str:
+def read_tail(path: str, n: int, encoding: str | None = None) -> str:
     """ファイルを後ろから指定した行だけ読み込む
 
     Args:
@@ -733,7 +761,7 @@ def read_tail(path: str, n: int, encoding: bool = None) -> str:
         encoding: ファイルのエンコード
 
     Returns:
-        str: 実際に読み込んだ結果
+        実際に読み込んだ結果
     """
     try:
         with open(path, "r", encoding=encoding) as f:
@@ -753,7 +781,7 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
         slash_only: パスの区切り文字をスラッシュのみにするかどうか
 
     Returns:
-        str: 変換後のファイルパス
+        変換後のファイルパス
     """
     file_name = ""
     for i in range(up_hierarchy_num):   # 指定された階層分だけパスの右側を避難する
@@ -773,14 +801,14 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
 
 
 # JANコードのチェックデジットを計算して取得する
-def get_check_digit(jan_code: int | str) -> int:
+def get_check_digit(jan_code: int | str) -> int | None:
     """JANコードのチェックデジットを計算して取得する
 
     Args:
         jan_code: 13桁のJANコードか、その最初の12桁
 
     Returns:
-        int: 13桁目のチェックデジット
+        13桁目のチェックデジット
     """
     if not type(jan_code) is str:
         jan_code = str(jan_code)
@@ -827,7 +855,7 @@ def imput_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in
         branch: 正常な入力かどうかを判断する関数
 
     Returns:
-        str: 入力された文字列
+        入力された文字列
     """
     while True:
         in_str = input(str_info)
@@ -838,6 +866,16 @@ def imput_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in
     return ""
 
 
+@overload
+def get_datatime_now() -> datetime.datetime:
+    pass
+
+
+@overload
+def get_datatime_now(to_str: bool) -> str:
+    pass
+
+
 def get_datatime_now(to_str: bool = False) -> datetime.datetime | str:
     """日本の現在の datetime を取得する
 
@@ -845,7 +883,7 @@ def get_datatime_now(to_str: bool = False) -> datetime.datetime | str:
         to_str: 文字列に変換して取得するフラグ
 
     Returns:
-        datetime | str: 日本の現在時間を datetime 型か文字列で返す
+        日本の現在時間を datetime 型か文字列で返す
     """
     datetime_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9), "JST"))     # 日本の現在時刻を取得する
     if not to_str:
@@ -861,37 +899,41 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
         decompression: 渡された値を圧縮ではなく展開するフラグ
 
     Returns:
-        str: 圧縮 or 展開した文字列
+        圧縮 or 展開した文字列
     """
     if decompression:                                           # 展開が指定されていれば展開する
         if type(hex_str) is not str:
             return ""                                           # 文字列以外が渡されたら空白の文字列を返す
         hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列をbase64の記号に復元する
         hex_str += "=" * (len(hex_str) % 4)                     # 取り除いたパディングを復元する
-        hex_str = hex_str.encode()
+        hex_bytes = hex_str.encode()
 
-        hex_str = base64.b64decode(hex_str)
-        hex_str = base64.b16encode(hex_str)
-        return hex_str.decode()
+        hex_bytes = base64.b64decode(hex_bytes)
+        hex_bytes = base64.b16encode(hex_bytes)
+        return hex_bytes.decode()
 
     if type(hex_str) is str:
-        hex_str = hex_str.encode()  # バイナリデータでなければバイナリに変換する
-    if len(hex_str) % 2 != 0:
-        hex_str = b"0" + hex_str    # 奇数の場合は先頭に0を追加して偶数にする
+        hex_bytes = hex_str.encode()    # バイナリデータでなければバイナリに変換する
+    elif type(hex_str) is bytes:
+        hex_bytes = hex_str
+    else:
+        raise ValueError("使用できない型が使用されました")
+    if len(hex_bytes) % 2 != 0:
+        hex_bytes = b"0" + hex_bytes    # 奇数の場合は先頭に0を追加して偶数にする
 
-    hex_str = base64.b16decode(hex_str, casefold=True)
-    hex_str = base64.b64encode(hex_str)
-    return hex_str.decode().replace("=", "").replace("+", "-").replace("/", "_")    # パディングを取り除いて安全な文字列に変換する
+    hex_bytes = base64.b16decode(hex_bytes, casefold=True)
+    hex_bytes = base64.b64encode(hex_bytes)
+    return hex_bytes.decode().replace("=", "").replace("+", "-").replace("/", "_")  # パディングを取り除いて安全な文字列に変換する
 
 
-def subprocess_command(command: str) -> str:
+def subprocess_command(command: list[str] | tuple[str]) -> bytes:
     """OSのコマンドを実行する
 
     Args:
         command: 実行するコマンド
 
     Returns:
-        str: 実行結果
+        実行結果
     """
     if platform.system() == "Windows":                  # Windowsの環境ではコマンドプロンプトを表示しないようにする
         si = subprocess.STARTUPINFO()
@@ -919,7 +961,7 @@ def can_cast(x: Any, cast_type: Callable) -> bool:
         cast_type: チェックするためのキャスト関数
 
     Returns:
-        bool: キャストできる場合は True
+        キャストできる場合は True
     """
     try:
         cast_type(x)
@@ -932,7 +974,7 @@ def get_python_version() -> str:
     """Pythonのバージョン情報を文字列で取得する
 
     Returns:
-        str: Pythonのバージョン
+        Pythonのバージョン
     """
-    version = "{}.{}.{}".format(sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
+    version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     return version
