@@ -15,6 +15,7 @@ import traceback
 import urllib.error
 import urllib.request
 from typing import Any, Callable, TypeAlias, Final
+from pathlib import Path
 
 OUTPUT_DIR = "./data"                       # 情報を出力する際のディレクトリ
 LOG_PATH = OUTPUT_DIR + "/lib.log"          # ログのファイルパス
@@ -55,7 +56,7 @@ class Vector2():
         self.set(x, y)
         return
 
-    def set(self, x: Number, y: Number = 0) -> Any:
+    def set(self, x: Number | tuple[Number, Number] | list[Number], y: Number = 0) -> Any:
         """それぞれの値を初期化する、値を指定しなかった場合は 0 で初期化される
         x に Vector2 クラスをそのまま渡せば、その Vector2 の値で初期化される
         x にリストやタプルを渡した場合は、一つ目の要素が x 二つ目の要素が y となる
@@ -245,7 +246,7 @@ class Vector2():
 class JsonData():
     """ Jsonファイルから一つの値を読み込んで保持するクラス
     """
-    def __init__(self, keys: str | list | tuple, default: JsonValue, path: str) -> None:
+    def __init__(self, keys: str | list | tuple, default: JsonValue, path: str | Path) -> None:
         """Jsonファイルから読み込む値を指定する
 
         Args:
@@ -507,7 +508,7 @@ def get_error_message(code: LibErrorCode) -> str:
     return "不明なエラーが発生しました"
 
 
-def print_log(message: object, console_print: bool = True, error_flag: bool = False, file_name: str = "", file_path: str = "") -> bool:
+def print_log(message: object, console_print: bool = True, error_flag: bool = False, file_name: str = "", file_path: str | Path = "") -> bool:
     """ログをファイルに出力する
 
     Args:
@@ -590,7 +591,7 @@ def print_debug(message: object, end: str = "\n") -> bool:
     return DISPLAY_DEBUG_LOG_FLAG
 
 
-def load_json(file_path: str) -> Any:
+def load_json(file_path: str | Path) -> Any:
     """jsonファイルを読み込む
 
     Args:
@@ -604,7 +605,7 @@ def load_json(file_path: str) -> Any:
     return obj
 
 
-def save_json(file_path: str, obj: Any, ensure_ascii: bool = False) -> None:
+def save_json(file_path: str | Path, obj: Any, ensure_ascii: bool = False) -> None:
     """データをjsonファイルに保存する
 
     Args:
@@ -724,7 +725,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
     return LibErrorCode.unknown
 
 
-def read_tail(path: str, n: int, encoding: bool = None) -> str:
+def read_tail(path: str, n: int, encoding: str | None = None) -> str:
     """ファイルを後ろから指定した行だけ読み込む
 
     Args:
@@ -773,7 +774,7 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
 
 
 # JANコードのチェックデジットを計算して取得する
-def get_check_digit(jan_code: int | str) -> int:
+def get_check_digit(jan_code: int | str) -> int | None:
     """JANコードのチェックデジットを計算して取得する
 
     Args:
