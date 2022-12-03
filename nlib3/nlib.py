@@ -42,7 +42,7 @@ class Vector2():
     """ ２次元ベクトルの値を格納するためのクラス
     Vector2.x と Vector2.y か Vector2[0] と Vector2[1] でそれぞれの値にアクセスできる
     """
-    def __init__(self, x: Number = 0, y: Number = 0) -> None:
+    def __init__(self, x: Number | tuple[Number, Number] | list[Number] = 0, y: Number = 0) -> None:
         """それぞれの値を初期化する、値を指定しなかった場合は 0 で初期化される
         x に Vector2 クラスをそのまま渡せば、その Vector2 の値で初期化される
         x にリストやタプルを渡した場合は、一つ目の要素が x 二つ目の要素が y となる
@@ -51,8 +51,8 @@ class Vector2():
             x: 数値を指定する
             y: 数値を指定する
         """
-        self.x = 0
-        self.y = 0
+        self.x: Number = 0
+        self.y: Number = 0
         self.set(x, y)
         return
 
@@ -333,7 +333,7 @@ class JsonData():
             self.set(0)
         return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
 
-    def get(self) -> JsonValue:
+    def get(self) -> JsonValue | None:
         """現在保持している値を取得する
 
         Returns:
@@ -373,7 +373,7 @@ class JsonData():
         return self.default
 
     @staticmethod
-    def dumps(json_data: str | dict) -> str:
+    def dumps(json_data: str | dict) -> str | None:
         """Jsonファイルか辞書を整形されたJson形式の文字列に変換する
 
         Args:
@@ -869,20 +869,24 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
             return ""                                           # 文字列以外が渡されたら空白の文字列を返す
         hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列をbase64の記号に復元する
         hex_str += "=" * (len(hex_str) % 4)                     # 取り除いたパディングを復元する
-        hex_str = hex_str.encode()
+        hex_bytes = hex_str.encode()
 
-        hex_str = base64.b64decode(hex_str)
-        hex_str = base64.b16encode(hex_str)
-        return hex_str.decode()
+        hex_bytes = base64.b64decode(hex_bytes)
+        hex_bytes = base64.b16encode(hex_bytes)
+        return hex_bytes.decode()
 
     if type(hex_str) is str:
-        hex_str = hex_str.encode()  # バイナリデータでなければバイナリに変換する
-    if len(hex_str) % 2 != 0:
-        hex_str = b"0" + hex_str    # 奇数の場合は先頭に0を追加して偶数にする
+        hex_bytes = hex_str.encode()    # バイナリデータでなければバイナリに変換する
+    elif type(hex_str) is bytes:
+        hex_bytes = hex_str
+    else:
+        raise ValueError("使用できない型が使用されました")
+    if len(hex_bytes) % 2 != 0:
+        hex_bytes = b"0" + hex_bytes    # 奇数の場合は先頭に0を追加して偶数にする
 
-    hex_str = base64.b16decode(hex_str, casefold=True)
-    hex_str = base64.b64encode(hex_str)
-    return hex_str.decode().replace("=", "").replace("+", "-").replace("/", "_")    # パディングを取り除いて安全な文字列に変換する
+    hex_bytes = base64.b16decode(hex_bytes, casefold=True)
+    hex_bytes = base64.b64encode(hex_bytes)
+    return hex_bytes.decode().replace("=", "").replace("+", "-").replace("/", "_")  # パディングを取り除いて安全な文字列に変換する
 
 
 def subprocess_command(command: str) -> str:
