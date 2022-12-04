@@ -243,6 +243,13 @@ class Vector2():
         raise IndexError
 
 
+class StrEnum(str, enum.Enum):
+    """str のサブクラスでもある列挙型定数を作成する基底クラス
+    """
+    def __str__(self):
+        return str(self.value)
+
+
 class JsonData():
     """ Jsonファイルから一つの値を読み込んで保持するクラス
     """
@@ -889,7 +896,7 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
     return hex_bytes.decode().replace("=", "").replace("+", "-").replace("/", "_")  # パディングを取り除いて安全な文字列に変換する
 
 
-def subprocess_command(command: str) -> str:
+def subprocess_command(command: str) -> bytes:
     """OSのコマンドを実行する
 
     Args:
