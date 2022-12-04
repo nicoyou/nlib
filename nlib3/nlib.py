@@ -14,8 +14,8 @@ import time
 import traceback
 import urllib.error
 import urllib.request
-from typing import Any, Callable, TypeAlias, Final
 from pathlib import Path
+from typing import Any, Callable, Final, TypeAlias, overload
 
 OUTPUT_DIR = "./data"                       # 情報を出力する際のディレクトリ
 LOG_PATH = OUTPUT_DIR + "/lib.log"          # ログのファイルパス
@@ -337,6 +337,7 @@ class JsonData():
             bool: データがファイルに保存されれば True
         """
         if not can_cast(self.get(), int):                   # int型に変換できない場合は初期化する
+            print_error_log(f"使用できない値を初期化します [keys={self.keys}, value={self.get()}]")
             self.set(0)
         return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
 
@@ -846,6 +847,16 @@ def imput_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in
     return ""
 
 
+@overload
+def get_datatime_now() -> datetime.datetime:
+    pass
+
+
+@overload
+def get_datatime_now(to_str: bool) -> str:
+    pass
+
+
 def get_datatime_now(to_str: bool = False) -> datetime.datetime | str:
     """日本の現在の datetime を取得する
 
@@ -896,7 +907,7 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
     return hex_bytes.decode().replace("=", "").replace("+", "-").replace("/", "_")  # パディングを取り除いて安全な文字列に変換する
 
 
-def subprocess_command(command: str) -> bytes:
+def subprocess_command(command: list[str] | tuple[str]) -> bytes:
     """OSのコマンドを実行する
 
     Args:
