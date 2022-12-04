@@ -140,7 +140,7 @@ class Vector2():
             return self.__class__(x, x)
 
     def __str__(self):
-        return "x={}, y={}".format(self.x, self.y)
+        return f"x={self.x}, y={self.y}"
 
     def __repr__(self):
         return self.__str__()
@@ -296,7 +296,7 @@ class JsonData():
         except Exception as e:
             self.data = self.default
             self.load_error_flag = True
-            print_error_log("jsonファイルの読み込みに失敗しました [keys={}]\n{}".format(self.keys, e))
+            print_error_log(f"jsonファイルの読み込みに失敗しました [keys={self.keys}]\n{e}")
         return False
 
     def save(self) -> bool:
@@ -312,18 +312,18 @@ class JsonData():
         try:
             json_data = load_json(self.path)
         except FileNotFoundError as e:              # ファイルが見つからなかった場合は
-            print_log("jsonファイルが見つからなかったため、新規生成します [keys={}]\n{}".format(self.keys, e))
+            print_log(f"jsonファイルが見つからなかったため、新規生成します [keys={self.keys}]\n{e}")
         except json.decoder.JSONDecodeError as e:   # JSONの文法エラーがあった場合は新たに上書き保存する
-            print_log("jsonファイルが壊れている為、再生成します [keys={}]\n{}".format(self.keys, e))
+            print_log(f"jsonファイルが壊れている為、再生成します [keys={self.keys}]\n{e}")
         except Exception as e:                      # 不明なエラーが起きた場合は上書きせず終了する
-            print_error_log("jsonファイルへのデータの保存に失敗しました [keys={}]\n{}".format(self.keys, e))
+            print_error_log(f"jsonファイルへのデータの保存に失敗しました [keys={self.keys}]\n{e}")
             return False
         try:
             update_nest_dict(json_data, self.keys, self.data)
             save_json(self.path, json_data)
             return True
         except Exception as e:
-            print_error_log("jsonへの出力に失敗しました [keys={}]\n{}".format(self.keys, e))
+            print_error_log(f"jsonへの出力に失敗しました [keys={self.keys}]\n{e}")
         return False
 
     def increment(self, save_flag: bool = False, num: int = 1) -> bool:
@@ -558,12 +558,11 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
 
                 code_name = ""
                 if class_name is not None:
-                    code_name = "{}.{}.{}({})".format(err_file_name, class_name, frame.f_code.co_name, frame.f_lineno)
+                    code_name = f"{err_file_name}.{class_name}.{frame.f_code.co_name}({frame.f_lineno})"
                 else:
-                    code_name = "{}.{}({})".format(err_file_name, frame.f_code.co_name, frame.f_lineno)
-                f.write("[{}] {}".format(time_now, code_name).ljust(90) + str(message).rstrip("\n").replace("\n", "\n" + "[{}]".format(time_now).ljust(90)) +
-                        "\n")                                                                                                                                 # 最後の改行文字を取り除いて文中の改行前にスペースを追加する
-            else:                                                                                                                                             # 普通のログ
+                    code_name = f"{err_file_name}.{frame.f_code.co_name}({frame.f_lineno})"
+                f.write(f"[{time_now}] {code_name}".ljust(90) + str(message).rstrip("\n").replace("\n", "\n" + f"[{time_now}]".ljust(90)) + "\n") # 最後の改行文字を取り除いて文中の改行前にスペースを追加する
+            else:                                                                                                                                 # 普通のログ
                 f.write("[{}] {}\n".format(time_now, str(message).rstrip("\n")))
             return True
     else:
@@ -957,5 +956,5 @@ def get_python_version() -> str:
     Returns:
         str: Pythonのバージョン
     """
-    version = "{}.{}.{}".format(sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
+    version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     return version
