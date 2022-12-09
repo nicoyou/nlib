@@ -24,7 +24,7 @@ DISPLAY_DEBUG_LOG_FLAG = True               # デバッグログを出力する�
 DEFAULT_ENCODING = "utf-8"                  # ファイルIO時の標準エンコード
 
 Number: TypeAlias = int | float
-JsonValue: TypeAlias = int | float | bool | str
+JsonValue: TypeAlias = int | float | bool | str | None
 
 
 class LibErrorCode(enum.Enum):
@@ -263,7 +263,7 @@ class JsonData():
         """
         self.keys = keys
         self.default = default
-        self.path = path
+        self.path = Path(path)
         self.data = None
         self.load_error_flag = False
         self.load()
@@ -380,26 +380,13 @@ class JsonData():
         """
         return self.default
 
-    @staticmethod
-    def dumps(json_data: str | dict) -> str | None:
-        """Jsonファイルか辞書を整形されたJson形式の文字列に変換する
-
-        Args:
-            json_data: Jsonファイルのファイルパスか、出力したいデータの辞書
+    def file_exists(self) -> bool:
+        """jsonファイルが存在するかどうかを取得する
 
         Returns:
-            str: 整形されたJson形式の文字列
+            ファイルが存在すればTrue
         """
-        if type(json_data) is str:
-            data = json.loads(json_data)
-        elif type(json_data) is dict:
-            data = json_data
-        else:
-            print_error_log("JSONデータの読み込みに失敗しました")
-            return None
-
-        data_str = json.dumps(data, indent=4, ensure_ascii=False)
-        return data_str
+        return self.path.is_file()
 
 
 class Url():
@@ -623,6 +610,28 @@ def save_json(file_path: str | Path, obj: Any, ensure_ascii: bool = False) -> No
     with open(file_path, "w", encoding=DEFAULT_ENCODING) as f:
         json.dump(obj, f, indent=4, ensure_ascii=ensure_ascii)
     return
+
+
+def json_dumps(json_data: str | dict, ensure_ascii: bool = False) -> str | None:
+    """Json文字列か辞書を整形されたJson形式の文字列に変換する
+
+    Args:
+        json_data: Jsonファイルのファイルパスか、出力したいデータの辞書
+        ensure_ascii: 非ASCII文字文字をエスケープする
+
+    Returns:
+        str: 整形されたJson形式の文字列
+    """
+    if type(json_data) is str:
+        data = json.loads(json_data)
+    elif type(json_data) is dict:
+        data = json_data
+    else:
+        print_error_log("JSONデータの読み込みに失敗しました")
+        return None
+
+    data_str = json.dumps(data, indent=4, ensure_ascii=ensure_ascii)
+    return data_str
 
 
 def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: object) -> bool:
