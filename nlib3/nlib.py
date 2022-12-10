@@ -17,11 +17,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Final, TypeAlias, overload
 
-OUTPUT_DIR = "./data"                       # 情報を出力する際のディレクトリ
-LOG_PATH = OUTPUT_DIR + "/lib.log"          # ログのファイルパス
-ERROR_LOG_PATH = OUTPUT_DIR + "/error.log"  # エラーログのファイルパス
-DISPLAY_DEBUG_LOG_FLAG = True               # デバッグログを出力するかどうか
-DEFAULT_ENCODING = "utf-8"                  # ファイルIO時の標準エンコード
+OUTPUT_DIR: Final[Path] = Path("./data")                # 情報を出力する際のディレクトリ
+LOG_PATH: Final[Path] = OUTPUT_DIR / "lib.log"          # ログのファイルパス
+ERROR_LOG_PATH: Final[Path] = OUTPUT_DIR / "error.log"  # エラーログのファイルパス
+DISPLAY_DEBUG_LOG_FLAG: Final[bool] = True              # デバッグログを出力するかどうか
+DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイルIO時の標準エンコード
 
 # type alias
 Number: TypeAlias = int | float
@@ -514,7 +514,7 @@ def get_error_message(code: LibErrorCode) -> str:
     return "不明なエラーが発生しました"
 
 
-def print_log(message: object, console_print: bool = True, error_flag: bool = False, file_name: str = "", file_path: str | Path = "") -> bool:
+def print_log(message: object, console_print: bool = True, error_flag: bool = False, file_name: str = "", file_path: str | Path | None = None) -> bool:
     """ログをファイルに出力する
 
     Args:
@@ -527,30 +527,30 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
     Returns:
         正常にファイルに出力できた場合は True
     """
-    log_path = LOG_PATH
+    log_path: Path = LOG_PATH
     if error_flag:  # エラーログの場合はファイルを変更する
         log_path = ERROR_LOG_PATH
     if file_name:
-        log_path = os.path.join(OUTPUT_DIR, f"{file_name}.log")
-    if file_path:
-        log_path = file_path
+        log_path = OUTPUT_DIR / f"{file_name}.log"
+    if file_path is not None:
+        log_path = Path(file_path)
     if console_print:
         print_debug(message)
     if file_name and file_path:
         raise ValueError
 
-    time_now = get_datatime_now(True)                                                   # 現在時刻を取得する
-    if not os.path.isfile(log_path) or os.path.getsize(log_path) < 1024 * 1000 * 50:    # 50MBより小さければ出力する
-        os.makedirs(OUTPUT_DIR, exist_ok=True)                                          # データを出力するディレクトリを生成する
+    time_now = get_datatime_now(True)                                           # 現在時刻を取得する
+    if not log_path.is_file() or log_path.stat().st_size < 1024 * 1000 * 50:    # 50MBより小さければ出力する
+        os.makedirs(OUTPUT_DIR, exist_ok=True)                                  # データを出力するディレクトリを生成する
         with open(log_path, mode="a", encoding=DEFAULT_ENCODING) as f:
-            if error_flag:                                                              # エラーログ
-                frame = inspect.currentframe().f_back.f_back                            # 関数が呼ばれた場所の情報を取得する
+            if error_flag:                                                      # エラーログ
+                frame = inspect.currentframe().f_back.f_back                    # 関数が呼ばれた場所の情報を取得する
                 try:
                     class_name = str(frame.f_locals["self"])
                     class_name = re.match(r'.*?__main__.(.*?) .*?', class_name)
                     if class_name is not None:
                         class_name = class_name.group(1)
-                except KeyError:                                                        # クラス名が見つからなければ
+                except KeyError:                                                # クラス名が見つからなければ
                     class_name = None
                 err_file_name = os.path.splitext(os.path.basename(frame.f_code.co_filename))[0]
 
