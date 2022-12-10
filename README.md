@@ -1,10 +1,81 @@
 # nlib3
+### Useful functions and classes are available.
 
-ちょっと便利な関数やクラスを使用できます。
+[![PyPI](https://img.shields.io/pypi/v/nlib3)](https://pypi.org/project/nlib3/)
+![Python versions](https://img.shields.io/pypi/pyversions/nlib3)
 
 
-# Release Notes
+## Installation
+```bash
+pip install nlib3
+```
+
+
+## USAGE ( Sample of some functions )
+```python
+import nlib3
+
+# 2 次元ベクトルの値を格納するためのクラス
+pos = nlib3.Vector2(10, 20)
+print(pos)                      # x=10, y=20
+print(pos.x, pos.y)             # 10 20
+print(pos[0], pos[1])           # 10 20
+print(pos["x"], pos["y"])       # 10 20
+print(pos + pos)                # x=20, y=40
+
+
+# URL を保持して、パラメーターやパスを簡単に編集できるクラス
+url = Url("https://a.com/b")
+print(url)                                      # https://a.com/b
+print(url := url / "aaa")                       # https://a.com/b/aaa
+print(url := url.with_name("test"))             # https://a.com/b/test
+print(url := url.add_param("id", 10))           # https://a.com/b/test?id=10
+print(url := url.parent.parent / "index.html")  # https://a.com/index.html?id=10
+print(url := url.add_param("sample", False))    # https://a.com/index.html?id=10&sample=false
+print(url.name)                                 # index.html
+if "id" in url:
+    print(url["id"])                            # 10
+
+
+# str のサブクラスでもある列挙型を作成する基底クラス
+class Alphabet(nlib3.StrEnum):
+    a = "a"
+    b = "b"
+    c = "c"
+
+print(Alphabet.a)               # a
+print(str(Alphabet.b))          # b
+print(f"{Alphabet.c}")          # c
+
+
+# Json ファイルから一つの値を読み込んで保持するクラス
+# ネストされた辞書にもアクセスでき、json ファイルの他の値には影響を及ぼさない
+jd = nlib3.JsonData(["a", "b", "c"], None, "test.json")
+jd.set(8, True)                 # 値を 8 に変更して保存する
+"""                             # このような json が生成されます
+{
+    "a": {
+        "b": {
+            "c": 8
+        }
+    }
+}
+"""
+```
+
+
+
+## Release Notes
 ```text
+----------------------------------------------------------------------------------------------------------
+ver.1.18.0 (2023/03/21)
+readme にライブラリの使用サンプルを追加
+Url クラスに format, pop_param メソッドや特殊メソッドを複数追加
+
+Url クラスの初期 URL にパラメーターを含む URL を渡すと正常に動作しない不具合を修正
+Url クラスの / 演算子がパラメーターを引き継がない不具合を修正
+Url クラスの parent メソッドが、不要な例外を投げていた不具合を修正
+
 ----------------------------------------------------------------------------------------------------------
 ver.1.17.0 (2022/12/10)
 属性を文字列として扱う列挙子を定義できる StrEnum クラスを追加
@@ -154,6 +225,7 @@ ver.1.0.0 (2020/10/15)
 ```
 
 
-# Author
-
+## Author
 Nicoyou
+
+[@NicoyouSoft](https://twitter.com/NicoyouSoft)

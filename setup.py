@@ -10,7 +10,7 @@ package_name = "nlib3"
 with open(os.path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
-with open(os.path.join(here, package_name, "__init__.py")) as f:
+with open(os.path.join(here, package_name.replace("-", "_"), "__init__.py")) as f:
     init_text = f.read()
     version = re.search(r'__version__\s*=\s*[\'\"](.+?)[\'\"]', init_text).group(1)
     license = re.search(r'__license__\s*=\s*[\'\"](.+?)[\'\"]', init_text).group(1)
@@ -25,8 +25,8 @@ assert author_email
 assert url
 
 setuptools.setup(
-    name=package_name,                                              # パッケージ名(プロジェクト名)
-    packages=[package_name],                                        # パッケージ内(プロジェクト内)のパッケージ名をリスト形式で指定 (ここを指定しないとパッケージが含まれずに、テキストのみのパッケージになってしまう)
+    name=package_name,                                              # パッケージ名 ( プロジェクト名 )
+    packages=[package_name.replace("-", "_")],                      # パッケージ内 ( プロジェクト内 ) のパッケージ名をリスト形式で指定 ( ここを指定しないとパッケージが含まれずに、テキストのみのパッケージになってしまう )
     version=version,                                                # バージョン
     license=license,                                                # ライセンス
     install_requires=[],                                            # pip installする際に同時にインストールされるパッケージ名をリスト形式で指定
@@ -44,5 +44,5 @@ setuptools.setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
-    ],                                                              # パッケージ(プロジェクト)の分類 ( https://pypi.org/classifiers/ )
+    ],                                                              # パッケージ ( プロジェクト ) の分類 ( https://pypi.org/classifiers/ )
 )

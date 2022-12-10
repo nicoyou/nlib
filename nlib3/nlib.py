@@ -14,6 +14,7 @@ import time
 import traceback
 import urllib.error
 import urllib.request
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Final, TypeAlias, overload
 
@@ -21,7 +22,7 @@ OUTPUT_DIR: Final[Path] = Path("./data")                # 情報を出力する�
 LOG_PATH: Final[Path] = OUTPUT_DIR / "lib.log"          # ログのファイルパス
 ERROR_LOG_PATH: Final[Path] = OUTPUT_DIR / "error.log"  # エラーログのファイルパス
 DISPLAY_DEBUG_LOG_FLAG: Final[bool] = True              # デバッグログを出力するかどうか
-DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイルIO時の標準エンコード
+DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイルIO の標準エンコード
 
 # type alias
 Number: TypeAlias = int | float
@@ -38,14 +39,14 @@ class LibErrorCode(enum.Enum):
     """
     success = enum.auto()           # 成功
     file_not_found = enum.auto()    # ファイルが見つからなかった
-    http = enum.auto()              # http通信のエラー
+    http = enum.auto()              # http 通信のエラー
     argument = enum.auto()          # 引数が原因のエラー
     cancel = enum.auto()            # 前提条件不一致で処理がキャンセルされたときのエラー
     unknown = enum.auto()           # 不明なエラー
 
 
 class Vector2():
-    """ ２次元ベクトルの値を格納するためのクラス
+    """2 次元ベクトルの値を格納するためのクラス
     Vector2.x と Vector2.y か Vector2[0] と Vector2[1] でそれぞれの値にアクセスできる
     """
     def __init__(self, x: Number | tuple[Number, Number] | list[Number] = 0, y: Number = 0) -> None:
@@ -74,13 +75,15 @@ class Vector2():
         if isinstance(x, self.__class__) and y == 0:
             self.x = x.x
             self.y = x.y
-            return self
-        if (type(x) in [tuple, list] and len(x) == 2) and y == 0:
-            self.x = x[0]
-            self.y = x[1]
-            return self
-        self.x = x
-        self.y = y
+        elif type(x) is tuple or type(x) is list:
+            if len(x) == 2 and y == 0:
+                self.x = x[0]
+                self.y = x[1]
+            else:
+                raise ValueError("不正な引数が指定されました")
+        else:
+            self.x = x
+            self.y = y
         return self
 
     def max(self) -> Number:
@@ -249,17 +252,141 @@ class Vector2():
         raise IndexError
 
 
+class Url(str):
+    """URL を格納するクラス
+    """
+    def __new__(cls, *content):
+        return str.__new__(cls, content[0])     # 他の引数を認識させないために情報を削る
+
+    def __init__(self, url: str, param: dict[str, Any] = {}) -> None:
+        self.url = str(url)     # Url クラスを渡されてもそのまま文字列として処理する
+        self.param = deepcopy(param)
+        self.SCHEME_END: Final[str] = "://"
+
+        if "?" in self.url:
+            temp = self.url.split("?")
+            if len(temp) != 2:
+                raise ValueError("不正な URL です")
+            self.url = temp[0]  # URL から ? を削除する
+            if temp[1] != "":   # パラメーターが存在すれば
+                for row in temp[1].split("&"):
+                    k, v = row.split("=")
+                    self.param |= {k: v}
+        return
+
+    @property
+    def name(self) -> str:
+        """URL の末尾を取得する
+
+        Returns:
+            URL の末尾
+        """
+        return self.url.split("/")[-1]
+
+    @property
+    def parent(self) -> Any:
+        """現在の URL の上位 URL を取得する
+
+        Returns:
+            現在の URL の上位 URL
+        """
+        temp = self.url.split(self.SCHEME_END)
+        if len(temp) != 2:
+            return self.__class__(("/").join(self.url.split("/")[:-1]), self.param)
+        return self.__class__(temp[0] + (self.SCHEME_END) + ("/").join(temp[1].split("/")[:-1]), self.param)
+
+    def with_name(self, name: str) -> Any:
+        """URL の name 属性を引数に与えた名前に変換した URL を取得
+
+        Args:
+            name: URL の末尾
+
+        Returns:
+            URL の末尾を変換した URL
+        """
+        return self.parent / name
+
+    def add_param(self, key: str, value: Any) -> Any:
+        """パラメータを追加する
+
+        Args:
+            key: パラメータのキー
+            value: 値
+
+        Returns:
+            パラメータを追加した URL オブジェクト
+        """
+        return self.__class__(self.url, self.param | {key: value})
+
+    def pop_param(self, key: str) -> Any:
+        """URL パラメーターを削除する
+
+        Args:
+            key: 削除するパラメーターのキー
+
+        Returns:
+            パラメータを削除した URL オブジェクト
+        """
+        param = deepcopy(self.param)
+        param.pop(key)
+        return self.__class__(self.url, param)
+
+    def format(self, *args: object, **kwargs: object):
+        """URL に対して format 関数を使用する
+
+        Returns:
+            format 関数の返り値
+        """
+        return self.url.format(*args, **kwargs)
+
+    def __truediv__(self, other: str) -> Any:
+        if other[0] == "/":
+            other = other[1:]
+        return self.__class__(self.url + "/" + other, self.param)
+
+    def __str__(self) -> str:
+        if self.param:
+            result = self.url
+            for i, (k, v) in enumerate(self.param.items()):
+                if i == 0:
+                    result += "?"
+                else:
+                    result += "&"
+                if type(v) is bool:     # bool 型はすべて小文字にする
+                    v = str(v).lower()
+                result += f"{k}={v}"
+            return result
+
+        return self.url
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __bool__(self) -> bool:
+        return bool(self.url) or bool(self.param)
+
+    def __getitem__(self, key: Any):
+        return self.param[key]
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self.param[key] = value
+        return
+
+    def __contains__(self, value) -> bool:
+        return value in self.param.keys()
+
+
 class StrEnum(str, enum.Enum):
-    """str のサブクラスでもある列挙型定数を作成する基底クラス
+    """str のサブクラスでもある列挙型を作成する基底クラス
     """
     def __str__(self) -> str:
         return str(self.value)
 
 
 class JsonData():
-    """ Jsonファイルから一つの値を読み込んで保持するクラス
+    """Jsonファイルから一つの値を読み込んで保持するクラス
     """
-    def __init__(self, keys: str | list | tuple, default: JsonValue, path: str | Path) -> None:
+    def __init__(self, keys: str | StrList, default: JsonValue, path: str | Path) -> None:
         """Jsonファイルから読み込む値を指定する
 
         Args:
@@ -346,7 +473,7 @@ class JsonData():
             self.set(0)
         return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
 
-    def get(self) -> JsonValue | None:
+    def get(self) -> JsonValue:
         """現在保持している値を取得する
 
         Returns:
@@ -395,76 +522,6 @@ class JsonData():
 
     def __str__(self) -> str:
         return str(self.data)
-
-    def __repr__(self) -> str:
-        return self.__str__()
-
-
-class Url():
-    """URLを格納するクラス
-    """
-    def __init__(self, url: str, param: str = "") -> None:
-        self.url = url
-        self.param = param
-        self.SCHEME_END: Final[str] = "://"
-        return
-
-    @property
-    def name(self) -> str:
-        """urlの末尾を取得する
-
-        Returns:
-            urlの末尾
-        """
-        return self.url.split("/")[-1]
-
-    @property
-    def parent(self) -> Any:
-        """現在のurlの上位urlを取得する
-
-        Raises:
-            ValueError: 不正なurlを指定した場合に発生
-
-        Returns:
-            現在のurlの上位url
-        """
-        if len(self.url.split(self.SCHEME_END)) != 2:
-            raise ValueError("正しいURLではありません")
-        tmp = self.url.split(self.SCHEME_END)
-        return self.__class__(tmp[0] + (self.SCHEME_END) + ("/").join(tmp[1].split("/")[:-1]))
-
-    def with_name(self, name: str) -> Any:
-        """urlのname属性を引数に与えた名前に変換したurlを取得
-
-        Args:
-            name: path名
-
-        Returns:
-            名前に変換したurl
-        """
-        return self.parent / name
-
-    def add_param(self, key: str, value: str | int | float) -> Any:
-        """パラメータを追加する
-
-        Args:
-            key: パラメータのキー
-            value: 値
-
-        Returns:
-            パラメータを追加した URL オブジェクト
-        """
-        return self.__class__(self.url, self.param + "&" + key + "=" + str(value))
-
-    def __truediv__(self, other: str) -> Any:
-        if other[0] == "/":
-            other = other[1:]
-        return self.__class__(self.url + "/" + other, self.param)
-
-    def __str__(self) -> str:
-        if self.param:
-            return self.url + "?" + self.param[1:]
-        return self.url
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -544,21 +601,27 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
         os.makedirs(OUTPUT_DIR, exist_ok=True)                                  # データを出力するディレクトリを生成する
         with open(log_path, mode="a", encoding=DEFAULT_ENCODING) as f:
             if error_flag:                                                      # エラーログ
-                frame = inspect.currentframe().f_back.f_back                    # 関数が呼ばれた場所の情報を取得する
-                try:
-                    class_name = str(frame.f_locals["self"])
-                    class_name = re.match(r'.*?__main__.(.*?) .*?', class_name)
-                    if class_name is not None:
-                        class_name = class_name.group(1)
-                except KeyError:                                                # クラス名が見つからなければ
-                    class_name = None
-                err_file_name = os.path.splitext(os.path.basename(frame.f_code.co_filename))[0]
+                frame = inspect.currentframe()                                  # 関数が呼ばれた場所の情報を取得する
+                if frame is not None:
+                    frame = frame.f_back
+                if frame is not None:
+                    frame = frame.f_back
 
                 code_name = ""
-                if class_name is not None:
-                    code_name = f"{err_file_name}.{class_name}.{frame.f_code.co_name}({frame.f_lineno})"
-                else:
-                    code_name = f"{err_file_name}.{frame.f_code.co_name}({frame.f_lineno})"
+                if frame is not None:
+                    try:
+                        class_name = str(frame.f_locals["self"])
+                        class_name = re.match(r'.*?__main__.(.*?) .*?', class_name)
+                        if class_name is not None:
+                            class_name = class_name.group(1)
+                    except KeyError:    # クラス名が見つからなければ
+                        class_name = None
+                    err_file_name = os.path.splitext(os.path.basename(frame.f_code.co_filename))[0]
+
+                    if class_name is not None:
+                        code_name = f"{err_file_name}.{class_name}.{frame.f_code.co_name}({frame.f_lineno})"
+                    else:
+                        code_name = f"{err_file_name}.{frame.f_code.co_name}({frame.f_lineno})"
                 f.write(f"[{time_now}] {code_name}".ljust(90) + str(message).rstrip("\n").replace("\n", "\n" + f"[{time_now}]".ljust(90)) + "\n") # 最後の改行文字を取り除いて文中の改行前にスペースを追加する
             else:                                                                                                                                 # 普通のログ
                 f.write("[{}] {}\n".format(time_now, str(message).rstrip("\n")))
@@ -752,7 +815,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
     return LibErrorCode.unknown
 
 
-def read_tail(path: str, n: int, encoding: str | None = None) -> str:
+def read_tail(path: str, n: int, encoding: str | None = None) -> list[str]:
     """ファイルを後ろから指定した行だけ読み込む
 
     Args:
@@ -768,7 +831,7 @@ def read_tail(path: str, n: int, encoding: str | None = None) -> str:
             lines = f.readlines()   # すべての行を取得する
     except FileNotFoundError:
         lines = []
-    return lines[-n:]               # 後ろからn行だけ返す
+    return lines[-n:]               # 後ろから n 行だけ返す
 
 
 def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash_only: bool = False) -> str:
@@ -777,7 +840,7 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
     Args:
         file_path: リネームするファイルパス
         dest_name: 変更後のディレクトリ名
-        up_hierarchy_num: 変更するディレクトリの深さ ( 一番深いディレクトリが０ )
+        up_hierarchy_num: 変更するディレクトリの深さ ( 一番深いディレクトリが 0 )
         slash_only: パスの区切り文字をスラッシュのみにするかどうか
 
     Returns:
@@ -926,8 +989,8 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
     return hex_bytes.decode().replace("=", "").replace("+", "-").replace("/", "_")  # パディングを取り除いて安全な文字列に変換する
 
 
-def subprocess_command(command: list[str] | tuple[str]) -> bytes:
-    """OSのコマンドを実行する
+def subprocess_command(command: StrList) -> bytes:
+    """OS のコマンドを実行する
 
     Args:
         command: 実行するコマンド
@@ -971,10 +1034,10 @@ def can_cast(x: Any, cast_type: Callable) -> bool:
 
 
 def get_python_version() -> str:
-    """Pythonのバージョン情報を文字列で取得する
+    """Python のバージョン情報を文字列で取得する
 
     Returns:
-        Pythonのバージョン
+        Python のバージョン
     """
     version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     return version
