@@ -23,8 +23,14 @@ ERROR_LOG_PATH = OUTPUT_DIR + "/error.log"  # エラーログのファイルパ�
 DISPLAY_DEBUG_LOG_FLAG = True               # デバッグログを出力するかどうか
 DEFAULT_ENCODING = "utf-8"                  # ファイルIO時の標準エンコード
 
+# type alias
 Number: TypeAlias = int | float
 JsonValue: TypeAlias = int | float | bool | str | None
+
+IntList: TypeAlias = list[int] | tuple[int, ...]
+FloatList: TypeAlias = list[float] | tuple[float, ...]
+BoolList: TypeAlias = list[bool] | tuple[bool, ...]
+StrList: TypeAlias = list[str] | tuple[str, ...]
 
 
 class LibErrorCode(enum.Enum):
