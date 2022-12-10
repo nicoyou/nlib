@@ -387,6 +387,12 @@ class JsonData():
         """
         return self.path.is_file()
 
+    def __str__(self) -> str:
+        return str(self.data)
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
 
 class Url():
     """URLを格納するクラス
