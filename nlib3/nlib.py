@@ -45,7 +45,7 @@ class LibErrorCode(enum.Enum):
 
 
 class Vector2():
-    """ ２次元ベクトルの値を格納するためのクラス
+    """2 次元ベクトルの値を格納するためのクラス
     Vector2.x と Vector2.y か Vector2[0] と Vector2[1] でそれぞれの値にアクセスできる
     """
     def __init__(self, x: Number | tuple[Number, Number] | list[Number] = 0, y: Number = 0) -> None:
@@ -75,7 +75,7 @@ class Vector2():
             self.x = x.x
             self.y = x.y
             return self
-        if (type(x) in [tuple, list] and len(x) == 2) and y == 0:
+        elif ((type(x) is tuple or type(x) is list) and len(x) == 2) and y == 0:
             self.x = x[0]
             self.y = x[1]
             return self
@@ -250,16 +250,16 @@ class Vector2():
 
 
 class StrEnum(str, enum.Enum):
-    """str のサブクラスでもある列挙型定数を作成する基底クラス
+    """str のサブクラスでもある列挙型を作成する基底クラス
     """
     def __str__(self) -> str:
         return str(self.value)
 
 
 class JsonData():
-    """ Jsonファイルから一つの値を読み込んで保持するクラス
+    """Jsonファイルから一つの値を読み込んで保持するクラス
     """
-    def __init__(self, keys: str | list | tuple, default: JsonValue, path: str | Path) -> None:
+    def __init__(self, keys: str | StrList, default: JsonValue, path: str | Path) -> None:
         """Jsonファイルから読み込む値を指定する
 
         Args:
@@ -777,7 +777,7 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
     Args:
         file_path: リネームするファイルパス
         dest_name: 変更後のディレクトリ名
-        up_hierarchy_num: 変更するディレクトリの深さ ( 一番深いディレクトリが０ )
+        up_hierarchy_num: 変更するディレクトリの深さ ( 一番深いディレクトリが 0 )
         slash_only: パスの区切り文字をスラッシュのみにするかどうか
 
     Returns:
@@ -926,8 +926,8 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
     return hex_bytes.decode().replace("=", "").replace("+", "-").replace("/", "_")  # パディングを取り除いて安全な文字列に変換する
 
 
-def subprocess_command(command: list[str] | tuple[str]) -> bytes:
-    """OSのコマンドを実行する
+def subprocess_command(command: StrList) -> bytes:
+    """OS のコマンドを実行する
 
     Args:
         command: 実行するコマンド
@@ -971,10 +971,10 @@ def can_cast(x: Any, cast_type: Callable) -> bool:
 
 
 def get_python_version() -> str:
-    """Pythonのバージョン情報を文字列で取得する
+    """Python のバージョン情報を文字列で取得する
 
     Returns:
-        Pythonのバージョン
+        Python のバージョン
     """
     version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     return version
