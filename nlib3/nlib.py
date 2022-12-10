@@ -74,13 +74,15 @@ class Vector2():
         if isinstance(x, self.__class__) and y == 0:
             self.x = x.x
             self.y = x.y
-            return self
-        elif ((type(x) is tuple or type(x) is list) and len(x) == 2) and y == 0:
-            self.x = x[0]
-            self.y = x[1]
-            return self
-        self.x = x
-        self.y = y
+        elif type(x) is tuple or type(x) is list:
+            if len(x) == 2 and y == 0:
+                self.x = x[0]
+                self.y = x[1]
+            else:
+                raise ValueError("不正な引数が指定されました")
+        else:
+            self.x = x
+            self.y = y
         return self
 
     def max(self) -> Number:
@@ -544,21 +546,27 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
         os.makedirs(OUTPUT_DIR, exist_ok=True)                                  # データを出力するディレクトリを生成する
         with open(log_path, mode="a", encoding=DEFAULT_ENCODING) as f:
             if error_flag:                                                      # エラーログ
-                frame = inspect.currentframe().f_back.f_back                    # 関数が呼ばれた場所の情報を取得する
-                try:
-                    class_name = str(frame.f_locals["self"])
-                    class_name = re.match(r'.*?__main__.(.*?) .*?', class_name)
-                    if class_name is not None:
-                        class_name = class_name.group(1)
-                except KeyError:                                                # クラス名が見つからなければ
-                    class_name = None
-                err_file_name = os.path.splitext(os.path.basename(frame.f_code.co_filename))[0]
+                frame = inspect.currentframe()                                  # 関数が呼ばれた場所の情報を取得する
+                if frame is not None:
+                    frame = frame.f_back
+                if frame is not None:
+                    frame = frame.f_back
 
                 code_name = ""
-                if class_name is not None:
-                    code_name = f"{err_file_name}.{class_name}.{frame.f_code.co_name}({frame.f_lineno})"
-                else:
-                    code_name = f"{err_file_name}.{frame.f_code.co_name}({frame.f_lineno})"
+                if frame is not None:
+                    try:
+                        class_name = str(frame.f_locals["self"])
+                        class_name = re.match(r'.*?__main__.(.*?) .*?', class_name)
+                        if class_name is not None:
+                            class_name = class_name.group(1)
+                    except KeyError:    # クラス名が見つからなければ
+                        class_name = None
+                    err_file_name = os.path.splitext(os.path.basename(frame.f_code.co_filename))[0]
+
+                    if class_name is not None:
+                        code_name = f"{err_file_name}.{class_name}.{frame.f_code.co_name}({frame.f_lineno})"
+                    else:
+                        code_name = f"{err_file_name}.{frame.f_code.co_name}({frame.f_lineno})"
                 f.write(f"[{time_now}] {code_name}".ljust(90) + str(message).rstrip("\n").replace("\n", "\n" + f"[{time_now}]".ljust(90)) + "\n") # 最後の改行文字を取り除いて文中の改行前にスペースを追加する
             else:                                                                                                                                 # 普通のログ
                 f.write("[{}] {}\n".format(time_now, str(message).rstrip("\n")))
@@ -752,7 +760,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
     return LibErrorCode.unknown
 
 
-def read_tail(path: str, n: int, encoding: str | None = None) -> str:
+def read_tail(path: str, n: int, encoding: str | None = None) -> list[str]:
     """ファイルを後ろから指定した行だけ読み込む
 
     Args:
@@ -768,7 +776,7 @@ def read_tail(path: str, n: int, encoding: str | None = None) -> str:
             lines = f.readlines()   # すべての行を取得する
     except FileNotFoundError:
         lines = []
-    return lines[-n:]               # 後ろからn行だけ返す
+    return lines[-n:]               # 後ろから n 行だけ返す
 
 
 def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash_only: bool = False) -> str:
