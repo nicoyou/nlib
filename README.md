@@ -1,9 +1,57 @@
 # nlib3
+### Useful functions and classes are available.
 
-ちょっと便利な関数やクラスを使用できます。
+[![PyPI](https://img.shields.io/pypi/v/nlib3)](https://pypi.org/project/nlib3/)
+![Python versions](https://img.shields.io/pypi/pyversions/nlib3)
 
 
-# Release Notes
+## Installation
+```bash
+pip install nlib3
+```
+
+
+## USAGE ( Sample of some functions )
+```python
+import nlib3
+
+# 2 次元ベクトルの値を格納するためのクラス
+pos = nlib3.Vector2(10, 20)
+print(pos)                      # x=10, y=20
+print(pos.x, pos.y)             # 10 20
+print(pos[0], pos[1])           # 10 20
+print(pos["x"], pos["y"])       # 10 20
+
+
+# str のサブクラスでもある列挙型を作成する基底クラス
+class Alphabet(nlib3.StrEnum):
+    a = "a"
+    b = "b"
+    c = "c"
+
+print(Alphabet.a)               # a
+print(str(Alphabet.b))          # b
+print(f"{Alphabet.c}")          # c
+
+
+# Jsonファイルから一つの値を読み込んで保持するクラス
+# ネストされた辞書にもアクセスでき、json ファイルの他の値には影響を及ぼさない
+jd = nlib3.JsonData(["a", "b", "c"], None, "test.json")
+jd.set(8, True)                 # 値を 8 に変更して保存する
+"""                             # このような json が生成されます
+{
+    "a": {
+        "b": {
+            "c": 8
+        }
+    }
+}
+"""
+```
+
+
+
+## Release Notes
 ```text
 ----------------------------------------------------------------------------------------------------------
 ver.1.17.0 (2022/12/10)
@@ -154,6 +202,7 @@ ver.1.0.0 (2020/10/15)
 ```
 
 
-# Author
-
+## Author
 Nicoyou
+
+[@NicoyouSoft](https://twitter.com/NicoyouSoft)
