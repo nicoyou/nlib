@@ -348,7 +348,7 @@ class JsonData():
             self.set(0)
         return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
 
-    def get(self) -> JsonValue | None:
+    def get(self) -> JsonValue:
         """現在保持している値を取得する
 
         Returns:
