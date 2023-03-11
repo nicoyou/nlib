@@ -403,7 +403,7 @@ class JsonData():
 
 
 class Url():
-    """URLを格納するクラス
+    """URL を格納するクラス
     """
     def __init__(self, url: str, param: str = "") -> None:
         self.url = url
@@ -413,36 +413,36 @@ class Url():
 
     @property
     def name(self) -> str:
-        """urlの末尾を取得する
+        """URL の末尾を取得する
 
         Returns:
-            urlの末尾
+            URL の末尾
         """
         return self.url.split("/")[-1]
 
     @property
     def parent(self) -> Any:
-        """現在のurlの上位urlを取得する
+        """現在の URL の上位 URL を取得する
 
         Raises:
-            ValueError: 不正なurlを指定した場合に発生
+            ValueError: 不正な URL を指定した場合に発生
 
         Returns:
-            現在のurlの上位url
+            現在の URL の上位 URL
         """
         if len(self.url.split(self.SCHEME_END)) != 2:
-            raise ValueError("正しいURLではありません")
+            raise ValueError("正しい URL ではありません")
         tmp = self.url.split(self.SCHEME_END)
         return self.__class__(tmp[0] + (self.SCHEME_END) + ("/").join(tmp[1].split("/")[:-1]))
 
     def with_name(self, name: str) -> Any:
-        """urlのname属性を引数に与えた名前に変換したurlを取得
+        """URL の name 属性を引数に与えた名前に変換した URL を取得
 
         Args:
-            name: path名
+            name: URL の末尾
 
         Returns:
-            名前に変換したurl
+            URL の末尾を変換した URL
         """
         return self.parent / name
 
@@ -457,6 +457,14 @@ class Url():
             パラメータを追加した URL オブジェクト
         """
         return self.__class__(self.url, self.param + "&" + key + "=" + str(value))
+
+    def format(self, *args: object, **kwargs: object):
+        """URL に対して format 関数を使用する
+
+        Returns:
+            format 関数の返り値
+        """
+        return self.url.format(*args, **kwargs)
 
     def __truediv__(self, other: str) -> Any:
         if other[0] == "/":
