@@ -21,7 +21,7 @@ OUTPUT_DIR: Final[Path] = Path("./data")                # 情報を出力する�
 LOG_PATH: Final[Path] = OUTPUT_DIR / "lib.log"          # ログのファイルパス
 ERROR_LOG_PATH: Final[Path] = OUTPUT_DIR / "error.log"  # エラーログのファイルパス
 DISPLAY_DEBUG_LOG_FLAG: Final[bool] = True              # デバッグログを出力するかどうか
-DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイルIO時の標準エンコード
+DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイルIO の標準エンコード
 
 # type alias
 Number: TypeAlias = int | float
@@ -38,7 +38,7 @@ class LibErrorCode(enum.Enum):
     """
     success = enum.auto()           # 成功
     file_not_found = enum.auto()    # ファイルが見つからなかった
-    http = enum.auto()              # http通信のエラー
+    http = enum.auto()              # http 通信のエラー
     argument = enum.auto()          # 引数が原因のエラー
     cancel = enum.auto()            # 前提条件不一致で処理がキャンセルされたときのエラー
     unknown = enum.auto()           # 不明なエラー
@@ -446,7 +446,7 @@ class Url():
         """
         return self.parent / name
 
-    def add_param(self, key: str, value: str | int | float) -> Any:
+    def add_param(self, key: str, value: str | int | float | bool) -> Any:
         """パラメータを追加する
 
         Args:
@@ -456,6 +456,8 @@ class Url():
         Returns:
             パラメータを追加した URL オブジェクト
         """
+        if type(value) is bool:                 # bool 型はすべて小文字にする
+            value = str(value).lower()
         return self.__class__(self.url, self.param + "&" + key + "=" + str(value))
 
     def format(self, *args: object, **kwargs: object):
