@@ -424,16 +424,13 @@ class Url():
     def parent(self) -> Any:
         """現在の URL の上位 URL を取得する
 
-        Raises:
-            ValueError: 不正な URL を指定した場合に発生
-
         Returns:
             現在の URL の上位 URL
         """
-        if len(self.url.split(self.SCHEME_END)) != 2:
-            raise ValueError("正しい URL ではありません")
-        tmp = self.url.split(self.SCHEME_END)
-        return self.__class__(tmp[0] + (self.SCHEME_END) + ("/").join(tmp[1].split("/")[:-1]))
+        temp = self.url.split(self.SCHEME_END)
+        if len(temp) != 2:
+            return self.__class__(("/").join(self.url.split("/")[:-1]))
+        return self.__class__(temp[0] + (self.SCHEME_END) + ("/").join(temp[1].split("/")[:-1]))
 
     def with_name(self, name: str) -> Any:
         """URL の name 属性を引数に与えた名前に変換した URL を取得
