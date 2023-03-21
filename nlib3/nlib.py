@@ -362,6 +362,19 @@ class Url(str):
     def __repr__(self) -> str:
         return self.__str__()
 
+    def __bool__(self) -> bool:
+        return bool(self.url) or bool(self.param)
+
+    def __getitem__(self, key: Any):
+        return self.param[key]
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        self.param[key] = value
+        return
+
+    def __contains__(self, value) -> bool:
+        return value in self.param.keys()
+
 
 class StrEnum(str, enum.Enum):
     """str のサブクラスでもある列挙型を作成する基底クラス

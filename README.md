@@ -25,14 +25,16 @@ print(pos + pos)                # x=20, y=40
 
 
 # URL を保持して、パラメーターやパスを簡単に編集できるクラス
-url = nlib3.Url("https://a.com/b")
-print(url)                                              # https://a.com/b
-print(url := url / "aaa")                               # https://a.com/b/aaa
-print(url := url.with_name("test"))                     # https://a.com/b/test
-print(url := url.add_param("id", 10))                   # https://a.com/b/test?id=10
-print(url := url.parent.parent / "index.html")          # https://a.com/index.html?id=10
-print(url := url.add_param("sample", False))            # https://a.com/index.html?id=10&sample=false
-print(url.name)                                         # index.html
+url = Url("https://a.com/b")
+print(url)                                      # https://a.com/b
+print(url := url / "aaa")                       # https://a.com/b/aaa
+print(url := url.with_name("test"))             # https://a.com/b/test
+print(url := url.add_param("id", 10))           # https://a.com/b/test?id=10
+print(url := url.parent.parent / "index.html")  # https://a.com/index.html?id=10
+print(url := url.add_param("sample", False))    # https://a.com/index.html?id=10&sample=false
+print(url.name)                                 # index.html
+if "id" in url:
+    print(url["id"])                            # 10
 
 
 # str のサブクラスでもある列挙型を作成する基底クラス
