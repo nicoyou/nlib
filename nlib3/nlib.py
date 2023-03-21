@@ -252,6 +252,117 @@ class Vector2():
         raise IndexError
 
 
+class Url(str):
+    """URL を格納するクラス
+    """
+    def __new__(cls, *content):
+        return str.__new__(cls, content[0])     # 他の引数を認識させないために情報を削る
+
+    def __init__(self, url: str, param: dict[str, Any] = {}) -> None:
+        self.url = str(url)     # Url クラスを渡されてもそのまま文字列として処理する
+        self.param = deepcopy(param)
+        self.SCHEME_END: Final[str] = "://"
+
+        if "?" in self.url:
+            temp = self.url.split("?")
+            if len(temp) != 2:
+                raise ValueError("不正な URL です")
+            self.url = temp[0]  # URL から ? を削除する
+            if temp[1] != "":   # パラメーターが存在すれば
+                for row in temp[1].split("&"):
+                    k, v = row.split("=")
+                    self.param |= {k: v}
+        return
+
+    @property
+    def name(self) -> str:
+        """URL の末尾を取得する
+
+        Returns:
+            URL の末尾
+        """
+        return self.url.split("/")[-1]
+
+    @property
+    def parent(self) -> Any:
+        """現在の URL の上位 URL を取得する
+
+        Returns:
+            現在の URL の上位 URL
+        """
+        temp = self.url.split(self.SCHEME_END)
+        if len(temp) != 2:
+            return self.__class__(("/").join(self.url.split("/")[:-1]), self.param)
+        return self.__class__(temp[0] + (self.SCHEME_END) + ("/").join(temp[1].split("/")[:-1]), self.param)
+
+    def with_name(self, name: str) -> Any:
+        """URL の name 属性を引数に与えた名前に変換した URL を取得
+
+        Args:
+            name: URL の末尾
+
+        Returns:
+            URL の末尾を変換した URL
+        """
+        return self.parent / name
+
+    def add_param(self, key: str, value: Any) -> Any:
+        """パラメータを追加する
+
+        Args:
+            key: パラメータのキー
+            value: 値
+
+        Returns:
+            パラメータを追加した URL オブジェクト
+        """
+        return self.__class__(self.url, self.param | {key: value})
+
+    def pop_param(self, key: str) -> Any:
+        """URL パラメーターを削除する
+
+        Args:
+            key: 削除するパラメーターのキー
+
+        Returns:
+            パラメータを削除した URL オブジェクト
+        """
+        param = deepcopy(self.param)
+        param.pop(key)
+        return self.__class__(self.url, param)
+
+    def format(self, *args: object, **kwargs: object):
+        """URL に対して format 関数を使用する
+
+        Returns:
+            format 関数の返り値
+        """
+        return self.url.format(*args, **kwargs)
+
+    def __truediv__(self, other: str) -> Any:
+        if other[0] == "/":
+            other = other[1:]
+        return self.__class__(self.url + "/" + other, self.param)
+
+    def __str__(self) -> str:
+        if self.param:
+            result = self.url
+            for i, (k, v) in enumerate(self.param.items()):
+                if i == 0:
+                    result += "?"
+                else:
+                    result += "&"
+                if type(v) is bool:     # bool 型はすべて小文字にする
+                    v = str(v).lower()
+                result += f"{k}={v}"
+            return result
+
+        return self.url
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+
 class StrEnum(str, enum.Enum):
     """str のサブクラスでもある列挙型を作成する基底クラス
     """
@@ -398,117 +509,6 @@ class JsonData():
 
     def __str__(self) -> str:
         return str(self.data)
-
-    def __repr__(self) -> str:
-        return self.__str__()
-
-
-class Url(str):
-    """URL を格納するクラス
-    """
-    def __new__(cls, *content):
-        return str.__new__(cls, content[0])     # 他の引数を認識させないために情報を削る
-
-    def __init__(self, url: str, param: dict[str, Any] = {}) -> None:
-        self.url = str(url)     # Url クラスを渡されてもそのまま文字列として処理する
-        self.param = deepcopy(param)
-        self.SCHEME_END: Final[str] = "://"
-
-        if "?" in self.url:
-            temp = self.url.split("?")
-            if len(temp) != 2:
-                raise ValueError("不正な URL です")
-            self.url = temp[0]  # URL から ? を削除する
-            if temp[1] != "":   # パラメーターが存在すれば
-                for row in temp[1].split("&"):
-                    k, v = row.split("=")
-                    self.param |= {k: v}
-        return
-
-    @property
-    def name(self) -> str:
-        """URL の末尾を取得する
-
-        Returns:
-            URL の末尾
-        """
-        return self.url.split("/")[-1]
-
-    @property
-    def parent(self) -> Any:
-        """現在の URL の上位 URL を取得する
-
-        Returns:
-            現在の URL の上位 URL
-        """
-        temp = self.url.split(self.SCHEME_END)
-        if len(temp) != 2:
-            return self.__class__(("/").join(self.url.split("/")[:-1]), self.param)
-        return self.__class__(temp[0] + (self.SCHEME_END) + ("/").join(temp[1].split("/")[:-1]), self.param)
-
-    def with_name(self, name: str) -> Any:
-        """URL の name 属性を引数に与えた名前に変換した URL を取得
-
-        Args:
-            name: URL の末尾
-
-        Returns:
-            URL の末尾を変換した URL
-        """
-        return self.parent / name
-
-    def add_param(self, key: str, value: Any) -> Any:
-        """パラメータを追加する
-
-        Args:
-            key: パラメータのキー
-            value: 値
-
-        Returns:
-            パラメータを追加した URL オブジェクト
-        """
-        return self.__class__(self.url, self.param | {key: value})
-
-    def pop_param(self, key: str) -> Any:
-        """URL パラメーターを削除する
-
-        Args:
-            key: 削除するパラメーターのキー
-
-        Returns:
-            パラメータを削除した URL オブジェクト
-        """
-        param = deepcopy(self.param)
-        param.pop(key)
-        return self.__class__(self.url, param)
-
-    def format(self, *args: object, **kwargs: object):
-        """URL に対して format 関数を使用する
-
-        Returns:
-            format 関数の返り値
-        """
-        return self.url.format(*args, **kwargs)
-
-    def __truediv__(self, other: str) -> Any:
-        if other[0] == "/":
-            other = other[1:]
-        return self.__class__(self.url + "/" + other, self.param)
-
-    def __str__(self) -> str:
-        if self.param:
-            result = self.url
-            for i, (k, v) in enumerate(self.param.items()):
-                if i == 0:
-                    result += "?"
-                else:
-                    result += "&"
-                if type(v) is bool:     # bool 型はすべて小文字にする
-                    v = str(v).lower()
-                result += f"{k}={v}"
-            return result
-
-        return self.url
 
     def __repr__(self) -> str:
         return self.__str__()

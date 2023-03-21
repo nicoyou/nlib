@@ -21,6 +21,18 @@ print(pos)                      # x=10, y=20
 print(pos.x, pos.y)             # 10 20
 print(pos[0], pos[1])           # 10 20
 print(pos["x"], pos["y"])       # 10 20
+print(pos + pos)                # x=20, y=40
+
+
+# URL を保持して、パラメーターやパスを簡単に編集できるクラス
+url = nlib3.Url("https://a.com/b")
+print(url)                                              # https://a.com/b
+print(url := url / "aaa")                               # https://a.com/b/aaa
+print(url := url.with_name("test"))                     # https://a.com/b/test
+print(url := url.add_param("id", 10))                   # https://a.com/b/test?id=10
+print(url := url.parent.parent / "index.html")          # https://a.com/index.html?id=10
+print(url := url.add_param("sample", False))            # https://a.com/index.html?id=10&sample=false
+print(url.name)                                         # index.html
 
 
 # str のサブクラスでもある列挙型を作成する基底クラス
@@ -34,7 +46,7 @@ print(str(Alphabet.b))          # b
 print(f"{Alphabet.c}")          # c
 
 
-# Jsonファイルから一つの値を読み込んで保持するクラス
+# Json ファイルから一つの値を読み込んで保持するクラス
 # ネストされた辞書にもアクセスでき、json ファイルの他の値には影響を及ぼさない
 jd = nlib3.JsonData(["a", "b", "c"], None, "test.json")
 jd.set(8, True)                 # 値を 8 に変更して保存する
