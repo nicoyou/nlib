@@ -14,6 +14,7 @@ import time
 import traceback
 import urllib.error
 import urllib.request
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Final, TypeAlias, overload
 
@@ -408,9 +409,9 @@ class Url(str):
     def __new__(cls, *content):
         return str.__new__(cls, content[0])     # 他の引数を認識させないために情報を削る
 
-    def __init__(self, url: str, param: str = "") -> None:
+    def __init__(self, url: str, param: dict[str, Any] = {}) -> None:
         self.url = url
-        self.param = param
+        self.param = deepcopy(param)
         self.SCHEME_END: Final[str] = "://"
         return
 
@@ -446,7 +447,7 @@ class Url(str):
         """
         return self.parent / name
 
-    def add_param(self, key: str, value: str | int | float | bool) -> Any:
+    def add_param(self, key: str, value: Any) -> Any:
         """パラメータを追加する
 
         Args:
@@ -456,9 +457,20 @@ class Url(str):
         Returns:
             パラメータを追加した URL オブジェクト
         """
-        if type(value) is bool:     # bool 型はすべて小文字にする
-            value = str(value).lower()
-        return self.__class__(self.url, self.param + "&" + key + "=" + str(value))
+        return self.__class__(self.url, self.param | {key: value})
+
+    def pop_param(self, key: str) -> Any:
+        """URL パラメーターを削除する
+
+        Args:
+            key: 削除するパラメーターのキー
+
+        Returns:
+            パラメータを削除した URL オブジェクト
+        """
+        param = deepcopy(self.param)
+        param.pop(key)
+        return self.__class__(self.url, param)
 
     def format(self, *args: object, **kwargs: object):
         """URL に対して format 関数を使用する
@@ -475,7 +487,17 @@ class Url(str):
 
     def __str__(self) -> str:
         if self.param:
-            return self.url + "?" + self.param[1:]
+            result = self.url
+            for i, (k, v) in enumerate(self.param.items()):
+                if i == 0:
+                    result += "?"
+                else:
+                    result += "&"
+                if type(v) is bool:     # bool 型はすべて小文字にする
+                    v = str(v).lower()
+                result += f"{k}={v}"
+            return result
+
         return self.url
 
     def __repr__(self) -> str:
