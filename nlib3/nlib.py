@@ -402,9 +402,12 @@ class JsonData():
         return self.__str__()
 
 
-class Url():
+class Url(str):
     """URL を格納するクラス
     """
+    def __new__(cls, *content):
+        return str.__new__(cls, content[0])     # 他の引数を認識させないために情報を削る
+
     def __init__(self, url: str, param: str = "") -> None:
         self.url = url
         self.param = param
@@ -453,7 +456,7 @@ class Url():
         Returns:
             パラメータを追加した URL オブジェクト
         """
-        if type(value) is bool:                 # bool 型はすべて小文字にする
+        if type(value) is bool:     # bool 型はすべて小文字にする
             value = str(value).lower()
         return self.__class__(self.url, self.param + "&" + key + "=" + str(value))
 
