@@ -410,9 +410,19 @@ class Url(str):
         return str.__new__(cls, content[0])     # 他の引数を認識させないために情報を削る
 
     def __init__(self, url: str, param: dict[str, Any] = {}) -> None:
-        self.url = url
+        self.url = str(url)     # Url クラスを渡されてもそのまま文字列として処理する
         self.param = deepcopy(param)
         self.SCHEME_END: Final[str] = "://"
+
+        if "?" in self.url:
+            temp = self.url.split("?")
+            if len(temp) != 2:
+                raise ValueError("不正な URL です")
+            self.url = temp[0]  # URL から ? を削除する
+            if temp[1] != "":   # パラメーターが存在すれば
+                for row in temp[1].split("&"):
+                    k, v = row.split("=")
+                    self.param |= {k: v}
         return
 
     @property
@@ -433,8 +443,8 @@ class Url(str):
         """
         temp = self.url.split(self.SCHEME_END)
         if len(temp) != 2:
-            return self.__class__(("/").join(self.url.split("/")[:-1]))
-        return self.__class__(temp[0] + (self.SCHEME_END) + ("/").join(temp[1].split("/")[:-1]))
+            return self.__class__(("/").join(self.url.split("/")[:-1]), self.param)
+        return self.__class__(temp[0] + (self.SCHEME_END) + ("/").join(temp[1].split("/")[:-1]), self.param)
 
     def with_name(self, name: str) -> Any:
         """URL の name 属性を引数に与えた名前に変換した URL を取得
