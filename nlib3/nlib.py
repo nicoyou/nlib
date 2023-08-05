@@ -3,6 +3,7 @@ import datetime
 import enum
 import inspect
 import json
+import logging
 import math
 import os
 import platform
@@ -22,7 +23,7 @@ OUTPUT_DIR: Final[Path] = Path("./data")                # 情報を出力する�
 LOG_PATH: Final[Path] = OUTPUT_DIR / "lib.log"          # ログのファイルパス
 ERROR_LOG_PATH: Final[Path] = OUTPUT_DIR / "error.log"  # エラーログのファイルパス
 DISPLAY_DEBUG_LOG_FLAG: Final[bool] = True              # デバッグログを出力するかどうか
-DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイルIO の標準エンコード
+DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイル IO の標準エンコード
 
 # type alias
 Number: TypeAlias = int | float
@@ -420,7 +421,6 @@ class JsonData():
                 return True
             except KeyError as e:
                 self.data = self.default        # キーが見つからなければデフォルト値を設定する
-                print_debug(e)
                 return True
         except FileNotFoundError as e:          # ファイルが見つからなかった場合はデフォルト値を設定する
             self.data = self.default
@@ -428,7 +428,7 @@ class JsonData():
         except Exception as e:
             self.data = self.default
             self.load_error_flag = True
-            print_error_log(f"jsonファイルの読み込みに失敗しました [keys={self.keys}]\n{e}")
+            print_error_log(f"json ファイルの読み込みに失敗しました [keys={self.keys}]\n{e}")
         return False
 
     def save(self) -> bool:
@@ -444,18 +444,18 @@ class JsonData():
         try:
             json_data = load_json(self.path)
         except FileNotFoundError as e:              # ファイルが見つからなかった場合は
-            print_log(f"jsonファイルが見つからなかったため、新規生成します [keys={self.keys}]\n{e}")
-        except json.decoder.JSONDecodeError as e:   # JSONの文法エラーがあった場合は新たに上書き保存する
-            print_log(f"jsonファイルが壊れている為、再生成します [keys={self.keys}]\n{e}")
+            print_log(f"json ファイルが見つからなかったため、新規生成します [keys={self.keys}]\n{e}")
+        except json.decoder.JSONDecodeError as e:   # json の文法エラーがあった場合は新たに上書き保存する
+            print_log(f"json ファイルが壊れている為、再生成します [keys={self.keys}]\n{e}")
         except Exception as e:                      # 不明なエラーが起きた場合は上書きせず終了する
-            print_error_log(f"jsonファイルへのデータの保存に失敗しました [keys={self.keys}]\n{e}")
+            print_error_log(f"json ファイルへのデータの保存に失敗しました [keys={self.keys}]\n{e}")
             return False
         try:
             update_nest_dict(json_data, self.keys, self.data)
             save_json(self.path, json_data)
             return True
         except Exception as e:
-            print_error_log(f"jsonへの出力に失敗しました [keys={self.keys}]\n{e}")
+            print_error_log(f"json への出力に失敗しました [keys={self.keys}]\n{e}")
         return False
 
     def increment(self, save_flag: bool = False, num: int = 1) -> bool:
@@ -468,7 +468,7 @@ class JsonData():
         Returns:
             データがファイルに保存されれば True
         """
-        if not can_cast(self.get(), int):                   # int型に変換できない場合は初期化する
+        if not can_cast(self.get(), int):                   # int 型に変換できない場合は初期化する
             print_error_log(f"使用できない値を初期化します [keys={self.keys}, value={self.get()}]")
             self.set(0)
         return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
@@ -513,10 +513,10 @@ class JsonData():
         return self.default
 
     def file_exists(self) -> bool:
-        """jsonファイルが存在するかどうかを取得する
+        """json ファイルが存在するかどうかを取得する
 
         Returns:
-            ファイルが存在すればTrue
+            ファイルが存在すれば True
         """
         return self.path.is_file()
 
@@ -571,8 +571,53 @@ def get_error_message(code: LibErrorCode) -> str:
     return "不明なエラーが発生しました"
 
 
+def create_logger(name: str = "main", path: Path | None = None, error_path: Path | None = None, level=logging.DEBUG, encoding=DEFAULT_ENCODING):
+    """ロガーを作成する
+
+    Args:
+        name: ロガー名
+        path: ログファイルのパス
+        error_path: ログレベルが ERROR 以上のログを出力するファイルのパス ( 指定しなかった場合は path と同じファイルに出力 )
+        level: 実際に表示する最低ログレベル
+
+    Returns:
+        出力情報が設定されたロガー
+    """
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S")
+    detailed_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(filename)s(%(lineno)d) %(message)s", "%Y-%m-%d %H:%M:%S")
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.DEBUG)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    if path is not None:
+        file_handler = logging.FileHandler(path, encoding=encoding)
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+
+        class LevelFilter(logging.Filter):
+            def filter(self, record):
+                return record.levelno in [logging.DEBUG, logging.INFO, logging.WARNING]
+
+        file_handler.addFilter(LevelFilter())   # ERROR 以上のログレベルは error_path に出力するため、file_handler からは除外する
+        logger.addHandler(file_handler)
+
+        error_file_handler = logging.FileHandler(error_path if error_path is not None else path, encoding=encoding)
+        error_file_handler.setLevel(logging.ERROR)
+        error_file_handler.setFormatter(detailed_formatter)
+        logger.addHandler(error_file_handler)
+    return logger
+
+
 def print_log(message: object, console_print: bool = True, error_flag: bool = False, file_name: str = "", file_path: str | Path | None = None) -> bool:
     """ログをファイルに出力する
+
+    Deprecated:
+        非推奨の関数です
+        この関数は create_logger 関数によって代替されました
 
     Args:
         message: ログに出力する内容
@@ -596,7 +641,7 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
     if file_name and file_path:
         raise ValueError
 
-    time_now = get_datatime_now(True)                                           # 現在時刻を取得する
+    time_now = get_datetime_now(True)                                           # 現在時刻を取得する
     if not log_path.is_file() or log_path.stat().st_size < 1024 * 1000 * 50:    # 50MBより小さければ出力する
         os.makedirs(OUTPUT_DIR, exist_ok=True)                                  # データを出力するディレクトリを生成する
         with open(log_path, mode="a", encoding=DEFAULT_ENCODING) as f:
@@ -622,8 +667,8 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
                         code_name = f"{err_file_name}.{class_name}.{frame.f_code.co_name}({frame.f_lineno})"
                     else:
                         code_name = f"{err_file_name}.{frame.f_code.co_name}({frame.f_lineno})"
-                f.write(f"[{time_now}] {code_name}".ljust(90) + str(message).rstrip("\n").replace("\n", "\n" + f"[{time_now}]".ljust(90)) + "\n") # 最後の改行文字を取り除いて文中の改行前にスペースを追加する
-            else:                                                                                                                                 # 普通のログ
+                f.write(f"[{time_now}] {code_name}".ljust(90) + str(message).rstrip("\n").replace("\n", "\n" + f"[{time_now}]".ljust(90)) + "\n")   # 最後の改行文字を取り除いて文中の改行前にスペースを追加する
+            else:                                                                                                                                   # 普通のログ
                 f.write("[{}] {}\n".format(time_now, str(message).rstrip("\n")))
             return True
     else:
@@ -633,6 +678,10 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
 
 def print_error_log(message: object, console_print: bool = True) -> bool:
     """エラーログを出力する
+
+    Deprecated:
+        非推奨の関数です
+        この関数は create_logger 関数によって代替されました
 
     Args:
         message: ログに出力する内容
@@ -646,6 +695,10 @@ def print_error_log(message: object, console_print: bool = True) -> bool:
 
 def print_debug(message: object, end: str = "\n") -> bool:
     """デバッグログをコンソールに出力する
+
+    Deprecated:
+        非推奨の関数です
+        この関数は create_logger 関数によって代替されました
 
     Args:
         message: 出力する内容
@@ -674,35 +727,32 @@ def load_json(file_path: str | Path) -> Any:
 
 
 def save_json(file_path: str | Path, obj: Any, ensure_ascii: bool = False) -> None:
-    """データをjsonファイルに保存する
+    """データを json ファイルに保存する
 
     Args:
-        file_path: jsonファイルパス
+        file_path: json ファイルパス
         data: 保存するデータ
-        ensure_ascii: 非ASCII文字文字をエスケープする
+        ensure_ascii: 非 ASCII 文字文字をエスケープする
     """
     with open(file_path, "w", encoding=DEFAULT_ENCODING) as f:
         json.dump(obj, f, indent=4, ensure_ascii=ensure_ascii)
     return
 
 
-def json_dumps(json_data: str | dict, ensure_ascii: bool = False) -> str | None:
-    """Json文字列か辞書を整形されたJson形式の文字列に変換する
+def json_dumps(json_data: str | dict, ensure_ascii: bool = False) -> str:
+    """Json 文字列か辞書を整形された Json 形式の文字列に変換する
 
     Args:
-        json_data: Jsonファイルのファイルパスか、出力したいデータの辞書
-        ensure_ascii: 非ASCII文字文字をエスケープする
+        json_data: Json ファイルのファイルパスか、出力したいデータの辞書
+        ensure_ascii: 非 ASCII 文字文字をエスケープする
 
     Returns:
-        整形されたJson形式の文字列
+        整形された Json 形式の文字列
     """
     if type(json_data) is str:
         data = json.loads(json_data)
-    elif type(json_data) is dict:
-        data = json_data
     else:
-        print_error_log("JSONデータの読み込みに失敗しました")
-        return None
+        data = json_data
 
     data_str = json.dumps(data, indent=4, ensure_ascii=ensure_ascii)
     return data_str
@@ -863,15 +913,15 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
     return file_path
 
 
-# JANコードのチェックデジットを計算して取得する
+# JAN コードのチェックデジットを計算して取得する
 def get_check_digit(jan_code: int | str) -> int | None:
-    """JANコードのチェックデジットを計算して取得する
+    """JAN コードのチェックデジットを計算して取得する
 
     Args:
-        jan_code: 13桁のJANコードか、その最初の12桁
+        jan_code: 13 桁の JAN コードか、その最初の 12 桁
 
     Returns:
-        13桁目のチェックデジット
+        13 桁目のチェックデジット
     """
     if not type(jan_code) is str:
         jan_code = str(jan_code)
@@ -910,7 +960,7 @@ def program_pause(program_end: bool = True) -> None:
     return
 
 
-def imput_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in_str != "") -> str:
+def input_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in_str != "") -> str:
     """条件に一致する文字が入力されるまで再入力を求める入力関数 ( デフォルトでは空白のみキャンセル )
 
     Args:
@@ -930,16 +980,16 @@ def imput_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in
 
 
 @overload
-def get_datatime_now() -> datetime.datetime:
+def get_datetime_now() -> datetime.datetime:
     pass
 
 
 @overload
-def get_datatime_now(to_str: bool) -> str:
+def get_datetime_now(to_str: bool) -> str:
     pass
 
 
-def get_datatime_now(to_str: bool = False) -> datetime.datetime | str:
+def get_datetime_now(to_str: bool = False) -> datetime.datetime | str:
     """日本の現在の datetime を取得する
 
     Args:
@@ -958,7 +1008,7 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
     """16進数の文字列を圧縮、展開する
 
     Args:
-        hex_str: 16進数の値
+        hex_str: 16 進数の値
         decompression: 渡された値を圧縮ではなく展開するフラグ
 
     Returns:
@@ -967,7 +1017,7 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
     if decompression:                                           # 展開が指定されていれば展開する
         if type(hex_str) is not str:
             return ""                                           # 文字列以外が渡されたら空白の文字列を返す
-        hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列をbase64の記号に復元する
+        hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列を base64 の記号に復元する
         hex_str += "=" * (len(hex_str) % 4)                     # 取り除いたパディングを復元する
         hex_bytes = hex_str.encode()
 
@@ -998,7 +1048,7 @@ def subprocess_command(command: StrList) -> bytes:
     Returns:
         実行結果
     """
-    if platform.system() == "Windows":                  # Windowsの環境ではコマンドプロンプトを表示しないようにする
+    if platform.system() == "Windows":                  # Windows の環境ではコマンドプロンプトを表示しないようにする
         si = subprocess.STARTUPINFO()
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW   # コマンドプロンプトを表示しない
         return subprocess.check_output(command, startupinfo=si)

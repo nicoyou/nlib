@@ -11,4 +11,4 @@ python setup.py sdist
 @rem ライブラリのパッケージ作成
 python setup.py bdist_wheel
 
-pause
+timeout 5
