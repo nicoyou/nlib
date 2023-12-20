@@ -3,6 +3,7 @@ import datetime
 import enum
 import inspect
 import json
+import logging
 import math
 import os
 import platform
@@ -570,8 +571,54 @@ def get_error_message(code: LibErrorCode) -> str:
     return "不明なエラーが発生しました"
 
 
+def create_logger(name: str = "main", path: Path | None = None, error_path: Path | None = None, level=logging.DEBUG, encoding=DEFAULT_ENCODING):
+    """ロガーを作成する
+
+    Args:
+        name: ロガー名
+        path: ログファイルのパス
+        error_path: ログレベルが ERROR 以上のログを出力するファイルのパス ( 指定しなかった場合は path と同じファイルに出力 )
+        level: 実際に表示する最低ログレベル
+
+    Returns:
+        出力情報が設定されたロガー
+    """
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S")
+    detailed_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(filename)s(%(lineno)d) %(message)s", "%Y-%m-%d %H:%M:%S")
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.DEBUG)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    if path is not None:
+        file_handler = logging.FileHandler(path, encoding=encoding)
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(detailed_formatter if error_path is None else formatter)
+        logger.addHandler(file_handler)
+
+        if error_path is not None:  # エラーログ用のファイルパスが指定されている場合は、エラーログ用のファイルハンドラを追加する
+            error_file_handler = logging.FileHandler(error_path, encoding=encoding)
+            error_file_handler.setLevel(logging.ERROR)
+            error_file_handler.setFormatter(detailed_formatter)
+            logger.addHandler(error_file_handler)
+
+            class LevelFilter(logging.Filter):
+                def filter(self, record):
+                    return record.levelno in [logging.DEBUG, logging.INFO, logging.WARNING]
+
+            file_handler.addFilter(LevelFilter())   # ERROR 以上のログレベルは error_path に出力するため、file_handler からは除外する
+    return logger
+
+
 def print_log(message: object, console_print: bool = True, error_flag: bool = False, file_name: str = "", file_path: str | Path | None = None) -> bool:
     """ログをファイルに出力する
+
+    Deprecated:
+        非推奨の関数です
+        この関数は create_logger 関数によって代替されました
 
     Args:
         message: ログに出力する内容
@@ -595,7 +642,7 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
     if file_name and file_path:
         raise ValueError
 
-    time_now = get_datatime_now(True)                                           # 現在時刻を取得する
+    time_now = get_datetime_now(True)                                           # 現在時刻を取得する
     if not log_path.is_file() or log_path.stat().st_size < 1024 * 1000 * 50:    # 50MBより小さければ出力する
         os.makedirs(OUTPUT_DIR, exist_ok=True)                                  # データを出力するディレクトリを生成する
         with open(log_path, mode="a", encoding=DEFAULT_ENCODING) as f:
@@ -633,6 +680,10 @@ def print_log(message: object, console_print: bool = True, error_flag: bool = Fa
 def print_error_log(message: object, console_print: bool = True) -> bool:
     """エラーログを出力する
 
+    Deprecated:
+        非推奨の関数です
+        この関数は create_logger 関数によって代替されました
+
     Args:
         message: ログに出力する内容
         console_print: 内容をコンソールに出力するかどうか
@@ -645,6 +696,10 @@ def print_error_log(message: object, console_print: bool = True) -> bool:
 
 def print_debug(message: object, end: str = "\n") -> bool:
     """デバッグログをコンソールに出力する
+
+    Deprecated:
+        非推奨の関数です
+        この関数は create_logger 関数によって代替されました
 
     Args:
         message: 出力する内容
@@ -859,15 +914,15 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
     return file_path
 
 
-# JANコードのチェックデジットを計算して取得する
+# JAN コードのチェックデジットを計算して取得する
 def get_check_digit(jan_code: int | str) -> int | None:
-    """JANコードのチェックデジットを計算して取得する
+    """JAN コードのチェックデジットを計算して取得する
 
     Args:
-        jan_code: 13桁のJANコードか、その最初の12桁
+        jan_code: 13 桁の JAN コードか、その最初の 12 桁
 
     Returns:
-        13桁目のチェックデジット
+        13 桁目のチェックデジット
     """
     if not type(jan_code) is str:
         jan_code = str(jan_code)
@@ -906,7 +961,7 @@ def program_pause(program_end: bool = True) -> None:
     return
 
 
-def imput_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in_str != "") -> str:
+def input_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in_str != "") -> str:
     """条件に一致する文字が入力されるまで再入力を求める入力関数 ( デフォルトでは空白のみキャンセル )
 
     Args:
@@ -926,16 +981,16 @@ def imput_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in
 
 
 @overload
-def get_datatime_now() -> datetime.datetime:
+def get_datetime_now() -> datetime.datetime:
     pass
 
 
 @overload
-def get_datatime_now(to_str: bool) -> str:
+def get_datetime_now(to_str: bool) -> str:
     pass
 
 
-def get_datatime_now(to_str: bool = False) -> datetime.datetime | str:
+def get_datetime_now(to_str: bool = False) -> datetime.datetime | str:
     """日本の現在の datetime を取得する
 
     Args:
@@ -963,7 +1018,7 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
     if decompression:                                           # 展開が指定されていれば展開する
         if type(hex_str) is not str:
             return ""                                           # 文字列以外が渡されたら空白の文字列を返す
-        hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列をbase64の記号に復元する
+        hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列を base64 の記号に復元する
         hex_str += "=" * (len(hex_str) % 4)                     # 取り除いたパディングを復元する
         hex_bytes = hex_str.encode()
 
