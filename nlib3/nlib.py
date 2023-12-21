@@ -596,20 +596,19 @@ def create_logger(name: str = "main", path: Path | None = None, error_path: Path
     if path is not None:
         file_handler = logging.FileHandler(path, encoding=encoding)
         file_handler.setLevel(logging.INFO)
-        file_handler.setFormatter(detailed_formatter if error_path is None else formatter)
+        file_handler.setFormatter(formatter)
+
+        class LevelFilter(logging.Filter):
+            def filter(self, record):
+                return record.levelno in [logging.DEBUG, logging.INFO, logging.WARNING]
+
+        file_handler.addFilter(LevelFilter())   # ERROR 以上のログレベルは error_path に出力するため、file_handler からは除外する
         logger.addHandler(file_handler)
 
-        if error_path is not None:  # エラーログ用のファイルパスが指定されている場合は、エラーログ用のファイルハンドラを追加する
-            error_file_handler = logging.FileHandler(error_path, encoding=encoding)
-            error_file_handler.setLevel(logging.ERROR)
-            error_file_handler.setFormatter(detailed_formatter)
-            logger.addHandler(error_file_handler)
-
-            class LevelFilter(logging.Filter):
-                def filter(self, record):
-                    return record.levelno in [logging.DEBUG, logging.INFO, logging.WARNING]
-
-            file_handler.addFilter(LevelFilter())   # ERROR 以上のログレベルは error_path に出力するため、file_handler からは除外する
+        error_file_handler = logging.FileHandler(error_path if error_path is not None else path, encoding=encoding)
+        error_file_handler.setLevel(logging.ERROR)
+        error_file_handler.setFormatter(detailed_formatter)
+        logger.addHandler(error_file_handler)
     return logger
 
 
@@ -1009,7 +1008,7 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
     """16進数の文字列を圧縮、展開する
 
     Args:
-        hex_str: 16進数の値
+        hex_str: 16 進数の値
         decompression: 渡された値を圧縮ではなく展開するフラグ
 
     Returns:
