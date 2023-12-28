@@ -1,29 +1,25 @@
 import base64
 import datetime
 import enum
-import inspect
 import json
 import logging
 import math
 import os
 import platform
-import re
 import subprocess
 import sys
 import threading
 import time
-import traceback
 import urllib.error
 import urllib.request
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Final, TypeAlias, overload
 
-OUTPUT_DIR: Final[Path] = Path("./data")                # 情報を出力する際のディレクトリ
-LOG_PATH: Final[Path] = OUTPUT_DIR / "lib.log"          # ログのファイルパス
-ERROR_LOG_PATH: Final[Path] = OUTPUT_DIR / "error.log"  # エラーログのファイルパス
-DISPLAY_DEBUG_LOG_FLAG: Final[bool] = True              # デバッグログを出力するかどうか
 DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイル IO の標準エンコード
+LOG_DIR: Final[Path] = Path("./logs")                   # ログを出力する際のディレクトリ
+LOG_PATH: Final[Path] = LOG_DIR / "lib.log"             # ログのファイルパス
+ERROR_LOG_PATH: Final[Path] = LOG_DIR / "error.log"     # エラーログのファイルパス
 
 # type alias
 Number: TypeAlias = int | float
@@ -428,7 +424,8 @@ class JsonData():
         except Exception as e:
             self.data = self.default
             self.load_error_flag = True
-            print_error_log(f"json ファイルの読み込みに失敗しました [keys={self.keys}]\n{e}")
+            LOGGER.error(f"json ファイルの読み込みに失敗しました [keys={self.keys}]")
+            LOGGER.exception(e)
         return False
 
     def save(self) -> bool:
@@ -438,24 +435,28 @@ class JsonData():
             ファイルへの保存が成功した場合は True
         """
         if self.load_error_flag:
-            print_error_log("データの読み込みに失敗しているため、上書き保存をスキップしました")
+            LOGGER.error("データの読み込みに失敗しているため、上書き保存をスキップしました")
             return False
         json_data = {}
         try:
             json_data = load_json(self.path)
         except FileNotFoundError as e:              # ファイルが見つからなかった場合は
-            print_log(f"json ファイルが見つからなかったため、新規生成します [keys={self.keys}]\n{e}")
+            LOGGER.info(f"json ファイルが見つからなかったため、新規生成します [keys={self.keys}]")
+            LOGGER.info(e)
         except json.decoder.JSONDecodeError as e:   # json の文法エラーがあった場合は新たに上書き保存する
-            print_log(f"json ファイルが壊れている為、再生成します [keys={self.keys}]\n{e}")
+            LOGGER.info(f"json ファイルが壊れている為、再生成します [keys={self.keys}]")
+            LOGGER.info(e)
         except Exception as e:                      # 不明なエラーが起きた場合は上書きせず終了する
-            print_error_log(f"json ファイルへのデータの保存に失敗しました [keys={self.keys}]\n{e}")
+            LOGGER.error(f"json ファイルへのデータの保存に失敗しました [keys={self.keys}]")
+            LOGGER.exception(e)
             return False
         try:
             update_nest_dict(json_data, self.keys, self.data)
             save_json(self.path, json_data)
             return True
         except Exception as e:
-            print_error_log(f"json への出力に失敗しました [keys={self.keys}]\n{e}")
+            LOGGER.error(f"json への出力に失敗しました [keys={self.keys}]")
+            LOGGER.exception(e)
         return False
 
     def increment(self, save_flag: bool = False, num: int = 1) -> bool:
@@ -469,7 +470,7 @@ class JsonData():
             データがファイルに保存されれば True
         """
         if not can_cast(self.get(), int):                   # int 型に変換できない場合は初期化する
-            print_error_log(f"使用できない値を初期化します [keys={self.keys}, value={self.get()}]")
+            LOGGER.error(f"使用できない値を初期化します [keys={self.keys}, value={self.get()}]")
             self.set(0)
         return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
 
@@ -538,13 +539,6 @@ def thread(func: Callable) -> Callable:
     return inner
 
 
-def make_lib_dir() -> None:
-    """ライブラリ内で使用するディレクトリを作成する
-    """
-    os.makedirs(OUTPUT_DIR, exist_ok=True)  # データを出力するディレクトリを生成する
-    return
-
-
 def get_error_message(code: LibErrorCode) -> str:
     """ライブラリ内エラーコードからエラーメッセージを取得する
 
@@ -567,7 +561,7 @@ def get_error_message(code: LibErrorCode) -> str:
     elif code == LibErrorCode.unknown:
         return "不明なエラーが発生しました"
     else:
-        print_error_log("登録されていないエラーコードが呼ばれました", console_print=False)
+        LOGGER.error("登録されていないエラーコードが呼ばれました")
     return "不明なエラーが発生しました"
 
 
@@ -612,114 +606,14 @@ def create_logger(name: str = "main", path: Path | None = None, error_path: Path
     return logger
 
 
-def print_log(message: object, console_print: bool = True, error_flag: bool = False, file_name: str = "", file_path: str | Path | None = None) -> bool:
-    """ログをファイルに出力する
-
-    Deprecated:
-        非推奨の関数です
-        この関数は create_logger 関数によって代替されました
-
-    Args:
-        message: ログに出力する内容
-        console_print: コンソール出力するかどうか
-        error_flag: 通常ログではなく、エラーログに出力するかどうか
-        file_name: 出力するファイル名を指定する ( 拡張子は不要 )
-        file_path: 出力するファイルのパスを指定する
-
-    Returns:
-        正常にファイルに出力できた場合は True
-    """
-    log_path: Path = LOG_PATH
-    if error_flag:  # エラーログの場合はファイルを変更する
-        log_path = ERROR_LOG_PATH
-    if file_name:
-        log_path = OUTPUT_DIR / f"{file_name}.log"
-    if file_path is not None:
-        log_path = Path(file_path)
-    if console_print:
-        print_debug(message)
-    if file_name and file_path:
-        raise ValueError
-
-    time_now = get_datetime_now(True)                                           # 現在時刻を取得する
-    if not log_path.is_file() or log_path.stat().st_size < 1024 * 1000 * 50:    # 50MBより小さければ出力する
-        os.makedirs(OUTPUT_DIR, exist_ok=True)                                  # データを出力するディレクトリを生成する
-        with open(log_path, mode="a", encoding=DEFAULT_ENCODING) as f:
-            if error_flag:                                                      # エラーログ
-                frame = inspect.currentframe()                                  # 関数が呼ばれた場所の情報を取得する
-                if frame is not None:
-                    frame = frame.f_back
-                if frame is not None:
-                    frame = frame.f_back
-
-                code_name = ""
-                if frame is not None:
-                    try:
-                        class_name = str(frame.f_locals["self"])
-                        class_name = re.match(r'.*?__main__.(.*?) .*?', class_name)
-                        if class_name is not None:
-                            class_name = class_name.group(1)
-                    except KeyError:    # クラス名が見つからなければ
-                        class_name = None
-                    err_file_name = os.path.splitext(os.path.basename(frame.f_code.co_filename))[0]
-
-                    if class_name is not None:
-                        code_name = f"{err_file_name}.{class_name}.{frame.f_code.co_name}({frame.f_lineno})"
-                    else:
-                        code_name = f"{err_file_name}.{frame.f_code.co_name}({frame.f_lineno})"
-                f.write(f"[{time_now}] {code_name}".ljust(90) + str(message).rstrip("\n").replace("\n", "\n" + f"[{time_now}]".ljust(90)) + "\n")   # 最後の改行文字を取り除いて文中の改行前にスペースを追加する
-            else:                                                                                                                                   # 普通のログ
-                f.write("[{}] {}\n".format(time_now, str(message).rstrip("\n")))
-            return True
-    else:
-        print_debug("ログファイルの容量がいっぱいの為、出力を中止しました")
-    return False
-
-
-def print_error_log(message: object, console_print: bool = True) -> bool:
-    """エラーログを出力する
-
-    Deprecated:
-        非推奨の関数です
-        この関数は create_logger 関数によって代替されました
-
-    Args:
-        message: ログに出力する内容
-        console_print: 内容をコンソールに出力するかどうか
-
-    Returns:
-        正常にファイルに出力できた場合は True
-    """
-    return print_log(message, console_print, True)
-
-
-def print_debug(message: object, end: str = "\n") -> bool:
-    """デバッグログをコンソールに出力する
-
-    Deprecated:
-        非推奨の関数です
-        この関数は create_logger 関数によって代替されました
-
-    Args:
-        message: 出力する内容
-        end: 最後に追加で出力される内容
-
-    Returns:
-        実際にコンソールに出力された場合は True
-    """
-    if DISPLAY_DEBUG_LOG_FLAG:
-        print(message, end=end)
-    return DISPLAY_DEBUG_LOG_FLAG
-
-
 def load_json(file_path: str | Path) -> Any:
-    """jsonファイルを読み込む
+    """json ファイルを読み込む
 
     Args:
-        file_path: jsonファイルパス
+        file_path: json ファイルパス
 
     Returns:
-        読み込んだjsonファイルのデータ
+        読み込んだ json ファイルのデータ
     """
     with open(file_path, "r", encoding=DEFAULT_ENCODING) as f:
         obj = json.load(f)
@@ -749,11 +643,7 @@ def json_dumps(json_data: str | dict, ensure_ascii: bool = False) -> str:
     Returns:
         整形された Json 形式の文字列
     """
-    if type(json_data) is str:
-        data = json.loads(json_data)
-    else:
-        data = json_data
-
+    data = json.loads(json_data) if (type(json_data) is str) else json_data
     data_str = json.dumps(data, indent=4, ensure_ascii=ensure_ascii)
     return data_str
 
@@ -763,7 +653,7 @@ def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: objec
 
     Args:
         dictionary: 更新する辞書
-        keys: 更新する値にたどり着くまでのキーを指定し、複数あればlistかtupleで指定する
+        keys: 更新する値にたどり着くまでのキーを指定し、複数あれば list か tuple で指定する
         value: 上書きする値
 
     Returns:
@@ -786,7 +676,7 @@ def check_url(url: str) -> bool:
     """リンク先が存在するかどうかを確認する
 
     Args:
-        url: 存在を確認するURL
+        url: 存在を確認する URL
 
     Returns:
         リンク先に正常にアクセスできた場合は True
@@ -806,7 +696,7 @@ def download_file(url: str, dest_path: str, overwrite: bool = True) -> LibErrorC
     """インターネット上からファイルをダウンロードする
 
     Args:
-        url: ダウンロードするファイルのURL
+        url: ダウンロードするファイルの URL
         dest_path: ダウンロードしたファイルを保存するローカルファイルパス
         overwrite: 同名のファイルが存在した場合に上書きするかどうか
 
@@ -826,13 +716,16 @@ def download_file(url: str, dest_path: str, overwrite: bool = True) -> LibErrorC
                 time.sleep(0.1)
                 return LibErrorCode.success
     except urllib.error.HTTPError as e:
-        print_error_log(f"{e} [url={url}]")
-        return LibErrorCode.argument    # HTTPエラーが発生した場合は引数エラーを返す
+        LOGGER.error(f"ファイルのダウンロードに失敗しました [url={url}]")
+        LOGGER.exception(e)
+        return LibErrorCode.argument    # HTTP エラーが発生した場合は引数エラーを返す
     except (urllib.error.URLError, TimeoutError) as e:
-        print_error_log(f"{e} [url={url}]")
+        LOGGER.error(f"ファイルのダウンロードに失敗しました [url={url}]")
+        LOGGER.exception(e)
         return LibErrorCode.http
     except FileNotFoundError as e:
-        print_error_log(f"{e} [url={url}]")
+        LOGGER.error(f"ファイルのダウンロードに失敗しました [url={url}]")
+        LOGGER.exception(e)
         return LibErrorCode.file_not_found
     return LibErrorCode.unknown
 
@@ -841,7 +734,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
     """ファイルをダウンロードして、失敗時に再ダウンロードを試みる
 
     Args:
-        url: ダウンロードするファイルのURL
+        url: ダウンロードするファイルの URL
         dest_path: ダウンロードしたファイルを保存するローカルファイルパス
         overwrite: 同名のファイルが存在した場合に上書きするかどうか
         trial_num: 最初の一回を含むダウンロード失敗時の再試行回数
@@ -855,7 +748,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
         return result
     for i in range(trial_num):
         if not os.path.isfile(dest_path):
-            print_debug(f"ダウンロードに失敗しました、{trial_interval}秒後に再ダウンロードします ( {i + 1} Fail )")
+            LOGGER.debug(f"ダウンロードに失敗しました、{trial_interval}秒後に再ダウンロードします ( {i + 1} Fail )")
             time.sleep(trial_interval)
             result = download_file(url, dest_path, overwrite)                                   # 一度目はエラーコードに関わらず失敗すればもう一度ダウンロードする
             if result == LibErrorCode.argument:                                                 # URLが間違っていれば処理を終了する
@@ -913,7 +806,6 @@ def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash
     return file_path
 
 
-# JAN コードのチェックデジットを計算して取得する
 def get_check_digit(jan_code: int | str) -> int | None:
     """JAN コードのチェックデジットを計算して取得する
 
@@ -940,7 +832,7 @@ def get_check_digit(jan_code: int | str) -> int | None:
                 odd_sum += int(jan_code[i])                         # 奇数桁の合計
         check_digit = (10 - (even_sum * 3 + odd_sum) % 10) % 10     # チェックデジット
     except Exception as e:
-        print_error_log(e)
+        LOGGER.exception(e)
         return None
     return check_digit
 
@@ -951,12 +843,7 @@ def program_pause(program_end: bool = True) -> None:
     Args:
         program_end: 再開した時にプログラムを終了する場合は True、処理を続ける場合は False
     """
-    if not False:   #__debug__:            # デバッグでなければ一時停止する
-        if program_end:
-            message = "Press Enter key to exit . . ."
-        else:
-            message = "Press Enter key to continue . . ."
-        input(message)
+    input("Press Enter key to exit . . ." if program_end else "Press Enter key to continue . . .")
     return
 
 
@@ -1056,16 +943,6 @@ def subprocess_command(command: StrList) -> bytes:
         return subprocess.check_output(command)
 
 
-def print_exc() -> None:
-    """スタックされているエラーを表示する
-    """
-    if DISPLAY_DEBUG_LOG_FLAG:
-        traceback.print_exc()
-        print_debug("\n")
-        print_debug(sys.exc_info())
-    return
-
-
 def can_cast(x: Any, cast_type: Callable) -> bool:
     """指定された値がキャストできるかどうかを確認する
 
@@ -1091,3 +968,6 @@ def get_python_version() -> str:
     """
     version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     return version
+
+
+LOGGER = create_logger(__name__, LOG_PATH, ERROR_LOG_PATH)  # ライブラリで使用するメインロガー
