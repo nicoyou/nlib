@@ -20,6 +20,7 @@ DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイル IO の標
 LOG_DIR: Final[Path] = Path("./logs")                   # ログを出力する際のディレクトリ
 LOG_PATH: Final[Path] = LOG_DIR / "lib.log"             # ログのファイルパス
 ERROR_LOG_PATH: Final[Path] = LOG_DIR / "error.log"     # エラーログのファイルパス
+main_logger: logging.Logger | None = None
 
 # type alias
 Number: TypeAlias = int | float
@@ -424,8 +425,8 @@ class JsonData():
         except Exception as e:
             self.data = self.default
             self.load_error_flag = True
-            LOGGER.error(f"json ファイルの読み込みに失敗しました [keys={self.keys}]")
-            LOGGER.exception(e)
+            get_main_logger().error(f"json ファイルの読み込みに失敗しました [keys={self.keys}]")
+            get_main_logger().exception(e)
         return False
 
     def save(self) -> bool:
@@ -435,28 +436,28 @@ class JsonData():
             ファイルへの保存が成功した場合は True
         """
         if self.load_error_flag:
-            LOGGER.error("データの読み込みに失敗しているため、上書き保存をスキップしました")
+            get_main_logger().error("データの読み込みに失敗しているため、上書き保存をスキップしました")
             return False
         json_data = {}
         try:
             json_data = load_json(self.path)
         except FileNotFoundError as e:              # ファイルが見つからなかった場合は
-            LOGGER.info(f"json ファイルが見つからなかったため、新規生成します [keys={self.keys}]")
-            LOGGER.info(e)
+            get_main_logger().info(f"json ファイルが見つからなかったため、新規生成します [keys={self.keys}]")
+            get_main_logger().info(e)
         except json.decoder.JSONDecodeError as e:   # json の文法エラーがあった場合は新たに上書き保存する
-            LOGGER.info(f"json ファイルが壊れている為、再生成します [keys={self.keys}]")
-            LOGGER.info(e)
+            get_main_logger().info(f"json ファイルが壊れている為、再生成します [keys={self.keys}]")
+            get_main_logger().info(e)
         except Exception as e:                      # 不明なエラーが起きた場合は上書きせず終了する
-            LOGGER.error(f"json ファイルへのデータの保存に失敗しました [keys={self.keys}]")
-            LOGGER.exception(e)
+            get_main_logger().error(f"json ファイルへのデータの保存に失敗しました [keys={self.keys}]")
+            get_main_logger().exception(e)
             return False
         try:
             update_nest_dict(json_data, self.keys, self.data)
             save_json(self.path, json_data)
             return True
         except Exception as e:
-            LOGGER.error(f"json への出力に失敗しました [keys={self.keys}]")
-            LOGGER.exception(e)
+            get_main_logger().error(f"json への出力に失敗しました [keys={self.keys}]")
+            get_main_logger().exception(e)
         return False
 
     def increment(self, save_flag: bool = False, num: int = 1) -> bool:
@@ -470,7 +471,7 @@ class JsonData():
             データがファイルに保存されれば True
         """
         if not can_cast(self.get(), int):                   # int 型に変換できない場合は初期化する
-            LOGGER.error(f"使用できない値を初期化します [keys={self.keys}, value={self.get()}]")
+            get_main_logger().error(f"使用できない値を初期化します [keys={self.keys}, value={self.get()}]")
             self.set(0)
         return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
 
@@ -561,7 +562,7 @@ def get_error_message(code: LibErrorCode) -> str:
     elif code == LibErrorCode.unknown:
         return "不明なエラーが発生しました"
     else:
-        LOGGER.error("登録されていないエラーコードが呼ばれました")
+        get_main_logger().error("登録されていないエラーコードが呼ばれました")
     return "不明なエラーが発生しました"
 
 
@@ -604,6 +605,32 @@ def create_logger(name: str = "main", path: Path | None = None, error_path: Path
         error_file_handler.setFormatter(detailed_formatter)
         logger.addHandler(error_file_handler)
     return logger
+
+
+def get_main_logger() -> logging.Logger:
+    """ライブラリ内で使用するメインのロガーを取得する
+
+    Returns:
+        メインのロガー
+    """
+    global main_logger
+    if main_logger is not None:
+        return main_logger
+    LOG_DIR.mkdir(parents=True, exist_ok=True)                          # ログディレクトリが存在しなければ作成する
+    main_logger = create_logger(__name__, LOG_PATH, ERROR_LOG_PATH)     # ライブラリで使用するメインロガー
+    return main_logger
+
+
+def set_main_logger(logger: logging.Logger) -> None:
+    """ライブラリ内で使用するメインのロガーを設定する
+    get_main_logger 関数が呼ばれる前に設定することで、ライブラリ内でも設定したロガーが使用される
+
+    Args:
+        logger: メインのロガー
+    """
+    global main_logger
+    main_logger = logger
+    return
 
 
 def load_json(file_path: str | Path) -> Any:
@@ -716,16 +743,16 @@ def download_file(url: str, dest_path: str, overwrite: bool = True) -> LibErrorC
                 time.sleep(0.1)
                 return LibErrorCode.success
     except urllib.error.HTTPError as e:
-        LOGGER.error(f"ファイルのダウンロードに失敗しました [url={url}]")
-        LOGGER.exception(e)
+        get_main_logger().error(f"ファイルのダウンロードに失敗しました [url={url}]")
+        get_main_logger().exception(e)
         return LibErrorCode.argument    # HTTP エラーが発生した場合は引数エラーを返す
     except (urllib.error.URLError, TimeoutError) as e:
-        LOGGER.error(f"ファイルのダウンロードに失敗しました [url={url}]")
-        LOGGER.exception(e)
+        get_main_logger().error(f"ファイルのダウンロードに失敗しました [url={url}]")
+        get_main_logger().exception(e)
         return LibErrorCode.http
     except FileNotFoundError as e:
-        LOGGER.error(f"ファイルのダウンロードに失敗しました [url={url}]")
-        LOGGER.exception(e)
+        get_main_logger().error(f"ファイルのダウンロードに失敗しました [url={url}]")
+        get_main_logger().exception(e)
         return LibErrorCode.file_not_found
     return LibErrorCode.unknown
 
@@ -748,7 +775,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
         return result
     for i in range(trial_num):
         if not os.path.isfile(dest_path):
-            LOGGER.debug(f"ダウンロードに失敗しました、{trial_interval}秒後に再ダウンロードします ( {i + 1} Fail )")
+            get_main_logger().debug(f"ダウンロードに失敗しました、{trial_interval}秒後に再ダウンロードします ( {i + 1} Fail )")
             time.sleep(trial_interval)
             result = download_file(url, dest_path, overwrite)                                   # 一度目はエラーコードに関わらず失敗すればもう一度ダウンロードする
             if result == LibErrorCode.argument:                                                 # URLが間違っていれば処理を終了する
@@ -832,7 +859,7 @@ def get_check_digit(jan_code: int | str) -> int | None:
                 odd_sum += int(jan_code[i])                         # 奇数桁の合計
         check_digit = (10 - (even_sum * 3 + odd_sum) % 10) % 10     # チェックデジット
     except Exception as e:
-        LOGGER.exception(e)
+        get_main_logger().exception(e)
         return None
     return check_digit
 
@@ -968,6 +995,3 @@ def get_python_version() -> str:
     """
     version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     return version
-
-
-LOGGER = create_logger(__name__, LOG_PATH, ERROR_LOG_PATH)  # ライブラリで使用するメインロガー
