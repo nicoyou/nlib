@@ -566,7 +566,7 @@ def get_error_message(code: LibErrorCode) -> str:
     return "不明なエラーが発生しました"
 
 
-def create_logger(name: str = "main", path: Path | None = None, error_path: Path | None = None, level=logging.DEBUG, encoding=DEFAULT_ENCODING):
+def create_logger(name: str = "main", path: Path | None = None, error_path: Path | None = None, level=logging.DEBUG, encoding=DEFAULT_ENCODING) -> logging.Logger:
     """ロガーを作成する
 
     Args:
@@ -582,6 +582,9 @@ def create_logger(name: str = "main", path: Path | None = None, error_path: Path
     detailed_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(filename)s(%(lineno)d) %(message)s", "%Y-%m-%d %H:%M:%S")
     logger = logging.getLogger(name)
     logger.setLevel(level)
+
+    if len(logger.handlers) != 0:   # logger のハンドラーが既に設定されていればそのまま返す
+        return logger
 
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(logging.DEBUG)
