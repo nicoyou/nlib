@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable, Final, TypeAlias, overload
+from typing import Any, Callable, Final, Self, TypeAlias, overload
 
 DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイル IO の標準エンコード
 LOG_DIR: Final[Path] = Path("./logs")                   # ログを出力する際のディレクトリ
@@ -33,8 +33,7 @@ StrList: TypeAlias = list[str] | tuple[str, ...]
 
 
 class LibErrorCode(enum.Enum):
-    """ライブラリ内の一部関数で返されるエラーコード
-    """
+    """ライブラリ内の一部関数で返されるエラーコード"""
     success = enum.auto()           # 成功
     file_not_found = enum.auto()    # ファイルが見つからなかった
     http = enum.auto()              # http 通信のエラー
@@ -44,7 +43,8 @@ class LibErrorCode(enum.Enum):
 
 
 class Vector2():
-    """2 次元ベクトルの値を格納するためのクラス
+    """
+    2 次元ベクトルの値を格納するためのクラス
     Vector2.x と Vector2.y か Vector2[0] と Vector2[1] でそれぞれの値にアクセスできる
     """
     def __init__(self, x: Number | tuple[Number, Number] | list[Number] = 0, y: Number = 0) -> None:
@@ -61,7 +61,7 @@ class Vector2():
         self.set(x, y)
         return
 
-    def set(self, x: Number | tuple[Number, Number] | list[Number], y: Number = 0) -> Any:
+    def set(self, x: Number | tuple[Number, Number] | list[Number], y: Number = 0) -> Self:
         """それぞれの値を初期化する、値を指定しなかった場合は 0 で初期化される
         x に Vector2 クラスをそのまま渡せば、その Vector2 の値で初期化される
         x にリストやタプルを渡した場合は、一つ目の要素が x 二つ目の要素が y となる
@@ -100,7 +100,7 @@ class Vector2():
         """
         return self.x if self.x <= self.y else self.y
 
-    def round(self) -> Any:     # __class__ 未対応のため Any
+    def round(self) -> Self:
         """x と y それぞれの小数点以下を丸める
 
         Returns:
@@ -108,7 +108,7 @@ class Vector2():
         """
         return self.__class__(round(self.x), round(self.y))
 
-    def floor(self) -> Any:
+    def floor(self) -> Self:
         """x と y それぞれの小数点以下を切り捨てる
 
         Returns:
@@ -116,7 +116,7 @@ class Vector2():
         """
         return self.__class__(math.floor(self.x), math.floor(self.y))
 
-    def ceil(self) -> Any:
+    def ceil(self) -> Self:
         """x と y それぞれの小数点以下を切り上げる
 
         Returns:
@@ -124,7 +124,7 @@ class Vector2():
         """
         return self.__class__(math.ceil(self.x), math.ceil(self.y))
 
-    def invert(self) -> Any:
+    def invert(self) -> Self:
         """x と y の値を入れ替える
 
         Returns:
@@ -132,7 +132,7 @@ class Vector2():
         """
         return self.__class__(self.y, self.x)
 
-    def to_self_type(self, x: Any) -> Any:
+    def to_self_type(self, x: Self) -> Self:
         """自クラス型以外の値を自クラス型へ変換する
 
         Args:
@@ -251,8 +251,7 @@ class Vector2():
 
 
 class Url(str):
-    """URL を格納するクラス
-    """
+    """URL を格納するクラス"""
     def __new__(cls, *content):
         return str.__new__(cls, content[0])     # 他の引数を認識させないために情報を削る
 
@@ -282,7 +281,7 @@ class Url(str):
         return self.url.split("/")[-1]
 
     @property
-    def parent(self) -> Any:
+    def parent(self) -> Self:
         """現在の URL の上位 URL を取得する
 
         Returns:
@@ -293,7 +292,7 @@ class Url(str):
             return self.__class__(("/").join(self.url.split("/")[:-1]), self.param)
         return self.__class__(temp[0] + (self.SCHEME_END) + ("/").join(temp[1].split("/")[:-1]), self.param)
 
-    def with_name(self, name: str) -> Any:
+    def with_name(self, name: str) -> Self:
         """URL の name 属性を引数に与えた名前に変換した URL を取得
 
         Args:
@@ -304,7 +303,7 @@ class Url(str):
         """
         return self.parent / name
 
-    def add_param(self, key: str, value: Any) -> Any:
+    def add_param(self, key: str, value: Any) -> Self:
         """パラメータを追加する
 
         Args:
@@ -316,7 +315,7 @@ class Url(str):
         """
         return self.__class__(self.url, self.param | {key: value})
 
-    def pop_param(self, key: str) -> Any:
+    def pop_param(self, key: str) -> Self:
         """URL パラメーターを削除する
 
         Args:
@@ -337,7 +336,7 @@ class Url(str):
         """
         return self.url.format(*args, **kwargs)
 
-    def __truediv__(self, other: str) -> Any:
+    def __truediv__(self, other: str) -> Self:
         if other[0] == "/":
             other = other[1:]
         return self.__class__(self.url + "/" + other, self.param)
@@ -530,8 +529,7 @@ class JsonData():
 
 
 def thread(func: Callable) -> Callable:
-    """関数をマルチスレッドで実行するためのデコレーター
-    """
+    """関数をマルチスレッドで実行するためのデコレーター"""
     def inner(*args, **kwargs) -> threading.Thread:
         th = threading.Thread(target=lambda: func(*args, **kwargs))
         th.start()
@@ -996,5 +994,4 @@ def get_python_version() -> str:
     Returns:
         Python のバージョン
     """
-    version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    return version
+    return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
