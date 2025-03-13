@@ -132,7 +132,7 @@ class Vector2():
         """
         return self.__class__(self.y, self.x)
 
-    def to_self_type(self, x: Self) -> Self:
+    def to_self_type(self, value: Self) -> Self:
         """自クラス型以外の値を自クラス型へ変換する
 
         Args:
@@ -141,10 +141,44 @@ class Vector2():
         Returns:
             自クラス型の値
         """
-        if isinstance(x, self.__class__):
-            return x
-        else:
-            return self.__class__(x, x)
+        if isinstance(value, self.__class__):
+            return value
+        elif type(value) is tuple or type(value) is list:
+            if len(value) == 2:
+                return self.__class__(value[0], value[1])
+            else:
+                raise ValueError("不正な引数が指定されました")
+        return self.__class__(value, value)
+
+    @property
+    def zero(self) -> Self:
+        """x, y が 0 の Vector2 を取得する"""
+        return self.__class__(0, 0)
+
+    @property
+    def one(self) -> Self:
+        """x, y が 1 の Vector2 を取得する"""
+        return self.__class__(1, 1)
+
+    @property
+    def up(self) -> Self:
+        """y が 1 の Vector2 を取得する"""
+        return self.__class__(0, 1)
+
+    @property
+    def down(self) -> Self:
+        """y が -1 の Vector2 を取得する"""
+        return self.__class__(0, -1)
+
+    @property
+    def left(self) -> Self:
+        """x が -1 の Vector2 を取得する"""
+        return self.__class__(-1, 0)
+
+    @property
+    def right(self) -> Self:
+        """x が 1 の Vector2 を取得する"""
+        return self.__class__(1, 0)
 
     def __str__(self) -> str:
         return f"x={self.x}, y={self.y}"
@@ -167,9 +201,17 @@ class Vector2():
         other = self.to_self_type(other)
         return (self.x < other.x and self.y < other.y)
 
+    def __le__(self, other):
+        other = self.to_self_type(other)
+        return (self.x <= other.x and self.y <= other.y)
+
     def __gt__(self, other):
         other = self.to_self_type(other)
         return (self.x > other.x and self.y > other.y)
+
+    def __ge__(self, other):
+        other = self.to_self_type(other)
+        return (self.x >= other.x and self.y >= other.y)
 
     # 算術演算子
     def __add__(self, other):
