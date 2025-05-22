@@ -24,12 +24,13 @@ main_logger: logging.Logger | None = None
 
 # type alias
 Number: TypeAlias = int | float
-JsonValue: TypeAlias = int | float | bool | str | None
 
 IntList: TypeAlias = list[int] | tuple[int, ...]
 FloatList: TypeAlias = list[float] | tuple[float, ...]
 BoolList: TypeAlias = list[bool] | tuple[bool, ...]
 StrList: TypeAlias = list[str] | tuple[str, ...]
+
+JsonValue: TypeAlias = int | float | bool | str | IntList | FloatList | BoolList | StrList | None
 
 
 class LibErrorCode(enum.Enum):
@@ -416,27 +417,25 @@ class Url(str):
 
 
 class StrEnum(str, enum.Enum):
-    """str のサブクラスでもある列挙型を作成する基底クラス
-    """
+    """【非推奨 : 代替 enum.StrEnum】str のサブクラスでもある列挙型を作成する基底クラス"""
     def __str__(self) -> str:
         return str(self.value)
 
 
 class JsonData():
-    """Jsonファイルから一つの値を読み込んで保持するクラス
-    """
+    """json ファイルから一つの値を読み込んで保持するクラス"""
     def __init__(self, keys: str | StrList, default: JsonValue, path: str | Path) -> None:
-        """Jsonファイルから読み込む値を指定する
+        """json ファイルから読み込む値を指定する
 
         Args:
-            keys: Jsonデータのキーを指定する ( 複数階層ある場合はリストで渡す )
-            default: 値が存在しなかった場合のデフォルトの値を設定する
-            path: Jsonファイルのパス
+            keys: json データのキーを指定する ( 複数階層ある場合はリストで渡す )
+            default: キーが存在しなかった場合のデフォルトの値を設定する
+            path: json ファイルのパス
         """
         self.keys = keys
         self.default = default
         self.path = Path(path)
-        self.data = None
+        self.data: JsonValue | None = None
         self.load_error_flag = False
         self.load()
         return
@@ -458,13 +457,13 @@ class JsonData():
                 self.data = json_data
                 return True
             except KeyError as e:
-                self.data = self.default        # キーが見つからなければデフォルト値を設定する
+                self.data = self.get_default()  # キーが見つからなければデフォルト値を設定する
                 return True
         except FileNotFoundError as e:          # ファイルが見つからなかった場合はデフォルト値を設定する
-            self.data = self.default
+            self.data = self.get_default()
             return True
         except Exception as e:
-            self.data = self.default
+            self.data = self.get_default()
             self.load_error_flag = True
             get_main_logger().error(f"json ファイルの読み込みに失敗しました [keys={self.keys}]")
             get_main_logger().exception(e)
@@ -479,7 +478,7 @@ class JsonData():
         if self.load_error_flag:
             get_main_logger().error("データの読み込みに失敗しているため、上書き保存をスキップしました")
             return False
-        json_data = {}
+
         try:
             json_data = load_json(self.path)
         except FileNotFoundError as e:              # ファイルが見つからなかった場合は
@@ -492,6 +491,7 @@ class JsonData():
             get_main_logger().error(f"json ファイルへのデータの保存に失敗しました [keys={self.keys}]")
             get_main_logger().exception(e)
             return False
+
         try:
             update_nest_dict(json_data, self.keys, self.data)
             save_json(self.path, json_data)
@@ -511,12 +511,12 @@ class JsonData():
         Returns:
             データがファイルに保存されれば True
         """
-        if not can_cast(self.get(), int):                   # int 型に変換できない場合は初期化する
+        if not isinstance(self.get(), int):                 # int 型に変換できない場合は初期化する
             get_main_logger().error(f"使用できない値を初期化します [keys={self.keys}, value={self.get()}]")
             self.set(0)
         return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
 
-    def get(self) -> JsonValue:
+    def get(self) -> JsonValue | None:
         """現在保持している値を取得する
 
         Returns:
@@ -540,7 +540,7 @@ class JsonData():
         return False            # 保存無し
 
     def get_keys(self) -> tuple:
-        """Jsonファイルのこの値が保存されているキーを取得する
+        """json ファイルのこの値が保存されているキーを取得する
 
         Returns:
             値にたどり着くまでのキー
@@ -676,7 +676,7 @@ def set_main_logger(logger: logging.Logger) -> None:
     return
 
 
-def load_json(file_path: str | Path) -> Any:
+def load_json(file_path: str | Path) -> dict[str, JsonValue] | JsonValue:
     """json ファイルを読み込む
 
     Args:
@@ -686,11 +686,11 @@ def load_json(file_path: str | Path) -> Any:
         読み込んだ json ファイルのデータ
     """
     with open(file_path, "r", encoding=DEFAULT_ENCODING) as f:
-        obj = json.load(f)
-    return obj
+        parsed_data = json.load(f)
+    return parsed_data
 
 
-def save_json(file_path: str | Path, obj: Any, ensure_ascii: bool = False) -> None:
+def save_json(file_path: str | Path, parsed_data: Any, ensure_ascii: bool = False) -> None:
     """データを json ファイルに保存する
 
     Args:
@@ -699,23 +699,22 @@ def save_json(file_path: str | Path, obj: Any, ensure_ascii: bool = False) -> No
         ensure_ascii: 非 ASCII 文字文字をエスケープする
     """
     with open(file_path, "w", encoding=DEFAULT_ENCODING) as f:
-        json.dump(obj, f, indent=4, ensure_ascii=ensure_ascii)
+        json.dump(parsed_data, f, indent=4, ensure_ascii=ensure_ascii)
     return
 
 
 def json_dumps(json_data: str | dict, ensure_ascii: bool = False) -> str:
-    """Json 文字列か辞書を整形された Json 形式の文字列に変換する
+    """json 文字列か辞書を整形された json 形式の文字列に変換する
 
     Args:
-        json_data: Json ファイルのファイルパスか、出力したいデータの辞書
+        json_data: json ファイルのファイルパスか、出力したいデータの辞書
         ensure_ascii: 非 ASCII 文字文字をエスケープする
 
     Returns:
-        整形された Json 形式の文字列
+        整形された json 形式の文字列
     """
     data = json.loads(json_data) if (type(json_data) is str) else json_data
-    data_str = json.dumps(data, indent=4, ensure_ascii=ensure_ascii)
-    return data_str
+    return json.dumps(data, indent=4, ensure_ascii=ensure_ascii)
 
 
 def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: object) -> bool:
@@ -800,14 +799,14 @@ def download_file(url: str, dest_path: str, overwrite: bool = True) -> LibErrorC
     return LibErrorCode.unknown
 
 
-def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, trial_num: int = 3, trial_interval: int = 3) -> LibErrorCode:
+def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, trial_count: int = 3, trial_interval: int = 3) -> LibErrorCode:
     """ファイルをダウンロードして、失敗時に再ダウンロードを試みる
 
     Args:
         url: ダウンロードするファイルの URL
         dest_path: ダウンロードしたファイルを保存するローカルファイルパス
         overwrite: 同名のファイルが存在した場合に上書きするかどうか
-        trial_num: 最初の一回を含むダウンロード失敗時の再試行回数
+        trial_count: 最初の一回を含むダウンロード失敗時の再試行回数
         trial_interval: ダウンロード再試行までのクールタイム
 
     Returns:
@@ -816,9 +815,9 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
     result = download_file(url, dest_path, overwrite)
     if result in [LibErrorCode.cancel, LibErrorCode.argument, LibErrorCode.file_not_found]:     # 既にファイルが存在した場合と引数が間違えている場合は処理を終了する
         return result
-    for i in range(trial_num):
+    for i in range(trial_count):
         if not os.path.isfile(dest_path):
-            get_main_logger().debug(f"ダウンロードに失敗しました、{trial_interval}秒後に再ダウンロードします ( {i + 1} Fail )")
+            get_main_logger().debug(f"ダウンロードに失敗しました、{trial_interval} 秒後に再ダウンロードします ( {i + 1} Fail )")
             time.sleep(trial_interval)
             result = download_file(url, dest_path, overwrite)                                   # 一度目はエラーコードに関わらず失敗すればもう一度ダウンロードする
             if result == LibErrorCode.argument:                                                 # URLが間違っていれば処理を終了する
@@ -962,7 +961,7 @@ def get_datetime_now(to_str: bool = False) -> datetime.datetime | str:
 
 
 def compress_hex(hex_str: str, decompression: bool = False) -> str:
-    """16進数の文字列を圧縮、展開する
+    """16 進数の文字列を圧縮、展開する
 
     Args:
         hex_str: 16 進数の値
@@ -972,7 +971,7 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
         圧縮 or 展開した文字列
     """
     if decompression:                                           # 展開が指定されていれば展開する
-        if type(hex_str) is not str:
+        if not isinstance(hex_str, str):
             return ""                                           # 文字列以外が渡されたら空白の文字列を返す
         hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列を base64 の記号に復元する
         hex_str += "=" * (len(hex_str) % 4)                     # 取り除いたパディングを復元する
@@ -982,9 +981,9 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
         hex_bytes = base64.b16encode(hex_bytes)
         return hex_bytes.decode()
 
-    if type(hex_str) is str:
+    if isinstance(hex_str, str):
         hex_bytes = hex_str.encode()    # バイナリデータでなければバイナリに変換する
-    elif type(hex_str) is bytes:
+    elif isinstance(hex_str, bytes):
         hex_bytes = hex_str
     else:
         raise ValueError("使用できない型が使用されました")
@@ -1014,7 +1013,7 @@ def subprocess_command(command: StrList) -> bytes:
 
 
 def can_cast(x: Any, cast_type: Callable) -> bool:
-    """指定された値がキャストできるかどうかを確認する
+    """【非推奨 : 代替 isinstance】指定された値がキャストできるかどうかを確認する
 
     Args:
         x: 確認する値
