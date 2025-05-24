@@ -16,10 +16,10 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Final, Self, TypeAlias, overload
 
-DEFAULT_ENCODING: Final[str] = "utf-8"                  # ファイル IO の標準エンコード
-LOG_DIR: Final[Path] = Path("./logs")                   # ログを出力する際のディレクトリ
-LOG_PATH: Final[Path] = LOG_DIR / "lib.log"             # ログのファイルパス
-ERROR_LOG_PATH: Final[Path] = LOG_DIR / "error.log"     # エラーログのファイルパス
+DEFAULT_ENCODING: Final[str] = "utf-8"                      # ファイル IO の標準エンコード
+LOG_DIRECTORY: Final[Path] = Path("./logs")                 # ログを出力する際のディレクトリ
+LOG_PATH: Final[Path] = LOG_DIRECTORY / "lib.log"           # ログのファイルパス
+ERROR_LOG_PATH: Final[Path] = LOG_DIRECTORY / "error.log"   # エラーログのファイルパス
 main_logger: logging.Logger | None = None
 
 # type alias
@@ -479,6 +479,7 @@ class JsonData():
             get_main_logger().error("データの読み込みに失敗しているため、上書き保存をスキップしました")
             return False
 
+        json_data: dict[str, JsonValue] = {}
         try:
             json_data = load_json(self.path)
         except FileNotFoundError as e:              # ファイルが見つからなかった場合は
@@ -501,20 +502,22 @@ class JsonData():
             get_main_logger().exception(e)
         return False
 
-    def increment(self, save_flag: bool = False, num: int = 1) -> bool:
-        """値をインクリメントしてファイルに保存する ( 数値以外が保存されていた場合は 0 で初期化 )
+    def increment(self, save_flag: bool = False, increment_value: int = 1) -> bool:
+        """値をインクリメントしてファイルに保存する ( 数値以外が保存されていた場合は 0 で初期化してからインクリメントする )
 
         Args:
             save_flag: ファイルにデータを保存するかどうかを指定する
-            num: 増加させる値を指定する
+            increment_value: 増加させる値を指定する
 
         Returns:
             データがファイルに保存されれば True
         """
-        if not isinstance(self.get(), int):                 # int 型に変換できない場合は初期化する
-            get_main_logger().error(f"使用できない値を初期化します [keys={self.keys}, value={self.get()}]")
-            self.set(0)
-        return self.set(int(self.get()) + num, save_flag)   # 一つインクリメントして値を保存する
+        try:
+            value = self.get_int()
+        except TypeError as e:                                  # int 型ではない場合は初期化する
+            get_main_logger().error(f"整数型ではないため初期化します [keys={self.keys}, value={self.get()}]")
+            value = 0
+        return self.set(value + increment_value, save_flag)     # 一つインクリメントして値を保存する
 
     def get(self) -> JsonValue | None:
         """現在保持している値を取得する
@@ -523,6 +526,48 @@ class JsonData():
             保持している値
         """
         return self.data
+
+    def get_int(self) -> int:
+        """整数値を取得し、静数値以外の場合は TypeError を発生させる
+
+        Returns:
+            整数値
+        """
+        if isinstance(self.data, int):
+            return self.data
+        raise TypeError(f"int 型ではなく {type(self.data).__name__} 型を保持しています")
+
+    def get_float(self) -> float:
+        """浮動小数点数値を取得し、静数値以外の場合は TypeError を発生させる
+
+        Returns:
+            浮動小数点数値
+        """
+        if isinstance(self.data, float):
+            return self.data
+        elif isinstance(self.data, int):
+            return float(self.data)
+        raise TypeError(f"float 型ではなく {type(self.data).__name__} 型を保持しています")
+
+    def get_str(self) -> str:
+        """文字列を取得し、文字列以外の場合は TypeError を発生させる
+
+        Returns:
+            文字列
+        """
+        if isinstance(self.data, str):
+            return self.data
+        raise TypeError(f"str 型ではなく {type(self.data).__name__} 型を保持しています")
+
+    def get_bool(self) -> bool:
+        """真偽値を取得し、真偽値以外の場合は TypeError を発生させる
+
+        Returns:
+            真偽値
+        """
+        if isinstance(self.data, bool):
+            return self.data
+        raise TypeError(f"bool 型ではなく {type(self.data).__name__} 型を保持しています")
 
     def set(self, data: JsonValue, save_flag: bool = False) -> bool:
         """新しい値を登録する
@@ -659,7 +704,7 @@ def get_main_logger() -> logging.Logger:
     global main_logger
     if main_logger is not None:
         return main_logger
-    LOG_DIR.mkdir(parents=True, exist_ok=True)                          # ログディレクトリが存在しなければ作成する
+    LOG_DIRECTORY.mkdir(parents=True, exist_ok=True)                    # ログディレクトリが存在しなければ作成する
     main_logger = create_logger(__name__, LOG_PATH, ERROR_LOG_PATH)     # ライブラリで使用するメインロガー
     return main_logger
 
