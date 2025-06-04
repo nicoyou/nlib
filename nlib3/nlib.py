@@ -528,7 +528,7 @@ class JsonData():
         return self.data
 
     def get_int(self) -> int:
-        """整数値を取得し、静数値以外の場合は TypeError を発生させる
+        """現在保持している整数値を取得し、整数値以外の場合は TypeError を発生させる
 
         Returns:
             整数値
@@ -538,7 +538,7 @@ class JsonData():
         raise TypeError(f"int 型ではなく {type(self.data).__name__} 型を保持しています")
 
     def get_float(self) -> float:
-        """浮動小数点数値を取得し、静数値以外の場合は TypeError を発生させる
+        """現在保持している浮動小数点数値を取得し、浮動小数点数値以外の場合は TypeError を発生させる
 
         Returns:
             浮動小数点数値
@@ -550,7 +550,7 @@ class JsonData():
         raise TypeError(f"float 型ではなく {type(self.data).__name__} 型を保持しています")
 
     def get_str(self) -> str:
-        """文字列を取得し、文字列以外の場合は TypeError を発生させる
+        """現在保持している文字列を取得し、文字列以外の場合は TypeError を発生させる
 
         Returns:
             文字列
@@ -560,7 +560,7 @@ class JsonData():
         raise TypeError(f"str 型ではなく {type(self.data).__name__} 型を保持しています")
 
     def get_bool(self) -> bool:
-        """真偽値を取得し、真偽値以外の場合は TypeError を発生させる
+        """現在保持している真偽値を取得し、真偽値以外の場合は TypeError を発生させる
 
         Returns:
             真偽値
@@ -1005,27 +1005,15 @@ def get_datetime_now(to_str: bool = False) -> datetime.datetime | str:
     return datetime_now.strftime("%Y-%m-%d %H:%M:%S")                                               # 文字列に変換する
 
 
-def compress_hex(hex_str: str, decompression: bool = False) -> str:
+def compress_hex(hex_str: str) -> str:
     """16 進数の文字列を圧縮、展開する
 
     Args:
         hex_str: 16 進数の値
-        decompression: 渡された値を圧縮ではなく展開するフラグ
 
     Returns:
-        圧縮 or 展開した文字列
+        圧縮した文字列
     """
-    if decompression:                                           # 展開が指定されていれば展開する
-        if not isinstance(hex_str, str):
-            return ""                                           # 文字列以外が渡されたら空白の文字列を返す
-        hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列を base64 の記号に復元する
-        hex_str += "=" * (len(hex_str) % 4)                     # 取り除いたパディングを復元する
-        hex_bytes = hex_str.encode()
-
-        hex_bytes = base64.b64decode(hex_bytes)
-        hex_bytes = base64.b16encode(hex_bytes)
-        return hex_bytes.decode()
-
     if isinstance(hex_str, str):
         hex_bytes = hex_str.encode()    # バイナリデータでなければバイナリに変換する
     elif isinstance(hex_str, bytes):
@@ -1038,6 +1026,26 @@ def compress_hex(hex_str: str, decompression: bool = False) -> str:
     hex_bytes = base64.b16decode(hex_bytes, casefold=True)
     hex_bytes = base64.b64encode(hex_bytes)
     return hex_bytes.decode().replace("=", "").replace("+", "-").replace("/", "_")  # パディングを取り除いて安全な文字列に変換する
+
+
+def decompress_hex(hex_str: str) -> str:
+    """圧縮された 16 進数の文字列を展開する
+
+    Args:
+        hex_str: 圧縮された 16 進数の文字列
+
+    Returns:
+        展開した文字列
+    """
+    if not isinstance(hex_str, str):
+        return ""                                           # 文字列以外が渡されたら空白の文字列を返す
+    hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列を base64 の記号に復元する
+    hex_str += "=" * (len(hex_str) % 4)                     # 取り除いたパディングを復元する
+    hex_bytes = hex_str.encode()
+
+    hex_bytes = base64.b64decode(hex_bytes)
+    hex_bytes = base64.b16encode(hex_bytes)
+    return hex_bytes.decode().lower()
 
 
 def subprocess_command(command: StrList) -> bytes:
