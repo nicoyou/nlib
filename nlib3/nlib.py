@@ -16,13 +16,13 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Final, Self, TypeAlias, overload
 
+# 定数
 DEFAULT_ENCODING: Final[str] = "utf-8"                      # ファイル IO の標準エンコード
 LOG_DIRECTORY: Final[Path] = Path("./logs")                 # ログを出力する際のディレクトリ
 LOG_PATH: Final[Path] = LOG_DIRECTORY / "lib.log"           # ログのファイルパス
 ERROR_LOG_PATH: Final[Path] = LOG_DIRECTORY / "error.log"   # エラーログのファイルパス
-main_logger: logging.Logger | None = None
 
-# type alias
+# 型別名
 Number: TypeAlias = int | float
 
 IntList: TypeAlias = list[int] | tuple[int, ...]
@@ -32,7 +32,11 @@ StrList: TypeAlias = list[str] | tuple[str, ...]
 
 JsonValue: TypeAlias = int | float | bool | str | IntList | FloatList | BoolList | StrList | None
 
+# グローバル変数
+main_logger: logging.Logger | None = None
 
+
+# クラス
 class LibErrorCode(enum.Enum):
     """ライブラリ内の一部関数で返されるエラーコード"""
     success = enum.auto()           # 成功
@@ -416,12 +420,6 @@ class Url(str):
         return value in self.param.keys()
 
 
-class StrEnum(str, enum.Enum):
-    """【非推奨 : 代替 enum.StrEnum】str のサブクラスでもある列挙型を作成する基底クラス"""
-    def __str__(self) -> str:
-        return str(self.value)
-
-
 class JsonData():
     """json ファイルから一つの値を読み込んで保持するクラス"""
     def __init__(self, keys: str | StrList, default: JsonValue, path: str | Path) -> None:
@@ -615,14 +613,160 @@ class JsonData():
         return self.__str__()
 
 
-def thread(func: Callable) -> Callable:
-    """関数をマルチスレッドで実行するためのデコレーター"""
-    def inner(*args, **kwargs) -> threading.Thread:
-        th = threading.Thread(target=lambda: func(*args, **kwargs))
-        th.start()
-        return th
+class StrEnum(str, enum.Enum):
+    """【非推奨 : 代替 enum.StrEnum】str のサブクラスでもある列挙型を作成する基底クラス"""
+    def __str__(self) -> str:
+        return str(self.value)
 
-    return inner
+
+# 汎用処理
+def compress_hex(hex_str: str) -> str:
+    """16 進数の文字列を圧縮、展開する
+
+    Args:
+        hex_str: 16 進数の値
+
+    Returns:
+        圧縮した文字列
+    """
+    if isinstance(hex_str, str):
+        hex_bytes = hex_str.encode()    # バイナリデータでなければバイナリに変換する
+    elif isinstance(hex_str, bytes):
+        hex_bytes = hex_str
+    else:
+        raise ValueError("使用できない型が使用されました")
+    if len(hex_bytes) % 2 != 0:
+        hex_bytes = b"0" + hex_bytes    # 奇数の場合は先頭に0を追加して偶数にする
+
+    hex_bytes = base64.b16decode(hex_bytes, casefold=True)
+    hex_bytes = base64.b64encode(hex_bytes)
+    return hex_bytes.decode().replace("=", "").replace("+", "-").replace("/", "_")  # パディングを取り除いて安全な文字列に変換する
+
+
+def decompress_hex(hex_str: str) -> str:
+    """圧縮された 16 進数の文字列を展開する
+
+    Args:
+        hex_str: 圧縮された 16 進数の文字列
+
+    Returns:
+        展開した文字列
+    """
+    if not isinstance(hex_str, str):
+        return ""                                           # 文字列以外が渡されたら空白の文字列を返す
+    hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列を base64 の記号に復元する
+    hex_str += "=" * (len(hex_str) % 4)                     # 取り除いたパディングを復元する
+    hex_bytes = hex_str.encode()
+
+    hex_bytes = base64.b64decode(hex_bytes)
+    hex_bytes = base64.b16encode(hex_bytes)
+    return hex_bytes.decode().lower()
+
+
+@overload
+def get_datetime_now() -> datetime.datetime:
+    pass
+
+
+@overload
+def get_datetime_now(to_str: bool) -> str:
+    pass
+
+
+def get_datetime_now(to_str: bool = False) -> datetime.datetime | str:
+    """日本の現在の datetime を取得する
+
+    Args:
+        to_str: 文字列として取得するかどうか
+
+    Returns:
+        日本の現在時間を datetime 型か文字列で返す
+    """
+    datetime_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9), "JST"))     # 日本の現在時刻を取得する
+    if not to_str:
+        return datetime_now
+    return datetime_now.strftime("%Y-%m-%d %H:%M:%S")                                               # 文字列に変換する
+
+
+def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: object) -> bool:
+    """ネストされた辞書内の特定の値のみを再帰で変更する
+
+    Args:
+        dictionary: 更新する辞書
+        keys: 更新する値にたどり着くまでのキーを指定し、複数あれば list か tuple で指定する
+        value: 上書きする値
+
+    Returns:
+        再帰せずに更新した場合のみ True、再帰した場合は False
+    """
+    if type(keys) is not list and type(keys) is not tuple:
+        keys = (keys, )                                         # 渡されがキーがリストでもタプルでもなければタプルに変換する
+    if len(keys) == 1:
+        dictionary[keys[0]] = value                             # 最深部に到達したら値を更新する
+        return True
+    if keys[0] in dictionary:
+        update_nest_dict(dictionary[keys[0]], keys[1:], value)  # すでにキーがあればその内部から更に探す
+    else:
+        dictionary[keys[0]] = {}                                # キーが存在しなければ空の辞書を追加する
+        update_nest_dict(dictionary[keys[0]], keys[1:], value)
+    return False
+
+
+def get_check_digit(jan_code: int | str) -> int | None:
+    """JAN コードのチェックデジットを計算して取得する
+
+    Args:
+        jan_code: 13 桁の JAN コードか、その最初の 12 桁
+
+    Returns:
+        13 桁目のチェックデジット
+    """
+    if not type(jan_code) is str:
+        jan_code = str(jan_code)
+    if len(jan_code) == 13:
+        jan_code = jan_code[:12]
+    if len(jan_code) != 12:
+        return None
+
+    try:
+        even_sum = 0
+        odd_sum = 0
+        for i in range(12):
+            if (i + 1) % 2 == 0:
+                even_sum += int(jan_code[i])                        # 偶数桁の合計
+            else:
+                odd_sum += int(jan_code[i])                         # 奇数桁の合計
+        check_digit = (10 - (even_sum * 3 + odd_sum) % 10) % 10     # チェックデジット
+    except Exception as e:
+        get_main_logger().exception(e)
+        return None
+    return check_digit
+
+
+def subprocess_command(command: StrList) -> bytes:
+    """OS のコマンドを実行する
+
+    Args:
+        command: 実行するコマンド
+
+    Returns:
+        実行結果
+    """
+    if platform.system() == "Windows":                  # Windows の環境ではコマンドプロンプトを表示しないようにする
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW   # コマンドプロンプトを表示しない
+        return subprocess.check_output(command, startupinfo=si)
+    else:                                               # STARTUPINFO が存在しない OS があるため処理を分岐する
+        return subprocess.check_output(command)
+
+
+def get_python_version() -> str:
+    """Python のバージョン情報を文字列で取得する
+
+    Returns:
+        Python のバージョン
+    """
+    return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
 
 def get_error_message(code: LibErrorCode) -> str:
@@ -651,6 +795,35 @@ def get_error_message(code: LibErrorCode) -> str:
     return "不明なエラーが発生しました"
 
 
+def can_cast(x: Any, cast_type: Callable) -> bool:
+    """【非推奨 : 代替 isinstance】指定された値がキャストできるかどうかを確認する
+
+    Args:
+        x: 確認する値
+        cast_type: チェックするためのキャスト関数
+
+    Returns:
+        キャストできる場合は True
+    """
+    try:
+        cast_type(x)
+    except ValueError:
+        return False
+    return True
+
+
+# 汎用デコレーター
+def thread(func: Callable) -> Callable:
+    """関数をマルチスレッドで実行するためのデコレーター"""
+    def inner(*args, **kwargs) -> threading.Thread:
+        th = threading.Thread(target=lambda: func(*args, **kwargs))
+        th.start()
+        return th
+
+    return inner
+
+
+# ファイル操作系
 def create_logger(name: str = "main", path: Path | None = None, error_path: Path | None = None, level=logging.DEBUG, encoding=DEFAULT_ENCODING) -> logging.Logger:
     """ロガーを作成する
 
@@ -762,30 +935,55 @@ def json_dumps(json_data: str | dict, ensure_ascii: bool = False) -> str:
     return json.dumps(data, indent=4, ensure_ascii=ensure_ascii)
 
 
-def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: object) -> bool:
-    """ネストされた辞書内の特定の値のみを再帰で変更する関数
+def read_tail(path: str, n: int, encoding: str | None = None) -> list[str]:
+    """ファイルを後ろから指定した行だけ読み込む
 
     Args:
-        dictionary: 更新する辞書
-        keys: 更新する値にたどり着くまでのキーを指定し、複数あれば list か tuple で指定する
-        value: 上書きする値
+        path: 読み込むファイルのファイルパス
+        n: 読み込む行数
+        encoding: ファイルのエンコード
 
     Returns:
-        再帰せずに更新した場合のみ True、再帰した場合は False
+        実際に読み込んだ結果
     """
-    if type(keys) is not list and type(keys) is not tuple:
-        keys = (keys, )                                         # 渡されがキーがリストでもタプルでもなければタプルに変換する
-    if len(keys) == 1:
-        dictionary[keys[0]] = value                             # 最深部に到達したら値を更新する
-        return True
-    if keys[0] in dictionary:
-        update_nest_dict(dictionary[keys[0]], keys[1:], value)  # すでにキーがあればその内部から更に探す
-    else:
-        dictionary[keys[0]] = {}                                # キーが存在しなければ空の辞書を追加する
-        update_nest_dict(dictionary[keys[0]], keys[1:], value)
-    return False
+    try:
+        with open(path, "r", encoding=encoding) as f:
+            lines = f.readlines()   # すべての行を取得する
+    except FileNotFoundError:
+        lines = []
+    return lines[-n:]               # 後ろから n 行だけ返す
 
 
+def rename_path(file_path: str, dest_name: str, levels_to_update: int = 0, is_unified_to_slash: bool = False) -> str:
+    """ファイルパスの指定した階層をリネームする
+
+    Args:
+        file_path: リネームするファイルパス
+        dest_name: 変更後のディレクトリ名
+        levels_to_update: 変更するディレクトリの深さ ( 一番深いディレクトリが 0 )
+        is_unified_to_slash: パスの区切り文字をスラッシュのみにするかどうか
+
+    Returns:
+        変換後のファイルパス
+    """
+    file_name = ""
+    for i in range(levels_to_update):   # 指定された階層分だけパスの右側を避難する
+        if i == 0:
+            file_name = os.path.basename(file_path)
+        else:
+            file_name = os.path.join(os.path.basename(file_path), file_name)
+        file_path = os.path.dirname(file_path)
+
+    file_path = os.path.dirname(file_path)              # 一番深い階層を削除する
+    file_path = os.path.join(file_path, dest_name)      # 一番深い階層を新しい名前で追加する
+    if file_name != "":
+        file_path = os.path.join(file_path, file_name)  # 避難したファイルパスを追加する
+    if is_unified_to_slash:
+        file_path = file_path.replace("\\", "/")        # 引数で指定されていれば区切り文字をスラッシュで統一する
+    return file_path
+
+
+# 通信系
 def check_url(url: str) -> bool:
     """リンク先が存在するかどうかを確認する
 
@@ -872,85 +1070,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
     return LibErrorCode.unknown
 
 
-def read_tail(path: str, n: int, encoding: str | None = None) -> list[str]:
-    """ファイルを後ろから指定した行だけ読み込む
-
-    Args:
-        path: 読み込むファイルのファイルパス
-        n: 読み込む行数
-        encoding: ファイルのエンコード
-
-    Returns:
-        実際に読み込んだ結果
-    """
-    try:
-        with open(path, "r", encoding=encoding) as f:
-            lines = f.readlines()   # すべての行を取得する
-    except FileNotFoundError:
-        lines = []
-    return lines[-n:]               # 後ろから n 行だけ返す
-
-
-def rename_path(file_path: str, dest_name: str, up_hierarchy_num: int = 0, slash_only: bool = False) -> str:
-    """ファイルパスの指定した階層をリネームする
-
-    Args:
-        file_path: リネームするファイルパス
-        dest_name: 変更後のディレクトリ名
-        up_hierarchy_num: 変更するディレクトリの深さ ( 一番深いディレクトリが 0 )
-        slash_only: パスの区切り文字をスラッシュのみにするかどうか
-
-    Returns:
-        変換後のファイルパス
-    """
-    file_name = ""
-    for i in range(up_hierarchy_num):   # 指定された階層分だけパスの右側を避難する
-        if i == 0:
-            file_name = os.path.basename(file_path)
-        else:
-            file_name = os.path.join(os.path.basename(file_path), file_name)
-        file_path = os.path.dirname(file_path)
-
-    file_path = os.path.dirname(file_path)              # 一番深い階層を削除する
-    file_path = os.path.join(file_path, dest_name)      # 一番深い階層を新しい名前で追加する
-    if file_name != "":
-        file_path = os.path.join(file_path, file_name)  # 避難したファイルパスを追加する
-    if slash_only:
-        file_path = file_path.replace("\\", "/")        # 引数で指定されていれば区切り文字をスラッシュで統一する
-    return file_path
-
-
-def get_check_digit(jan_code: int | str) -> int | None:
-    """JAN コードのチェックデジットを計算して取得する
-
-    Args:
-        jan_code: 13 桁の JAN コードか、その最初の 12 桁
-
-    Returns:
-        13 桁目のチェックデジット
-    """
-    if not type(jan_code) is str:
-        jan_code = str(jan_code)
-    if len(jan_code) == 13:
-        jan_code = jan_code[:12]
-    if len(jan_code) != 12:
-        return None
-
-    try:
-        even_sum = 0
-        odd_sum = 0
-        for i in range(12):
-            if (i + 1) % 2 == 0:
-                even_sum += int(jan_code[i])                        # 偶数桁の合計
-            else:
-                odd_sum += int(jan_code[i])                         # 奇数桁の合計
-        check_digit = (10 - (even_sum * 3 + odd_sum) % 10) % 10     # チェックデジット
-    except Exception as e:
-        get_main_logger().exception(e)
-        return None
-    return check_digit
-
-
+# プロンプト専用
 def program_pause(program_end: bool = True) -> None:
     """入力待機でプログラムを一時停止する関数
 
@@ -978,114 +1098,3 @@ def input_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in
         else:
             print("\n不正な値が入力されました、再度入力して下さい")
     return ""
-
-
-@overload
-def get_datetime_now() -> datetime.datetime:
-    pass
-
-
-@overload
-def get_datetime_now(to_str: bool) -> str:
-    pass
-
-
-def get_datetime_now(to_str: bool = False) -> datetime.datetime | str:
-    """日本の現在の datetime を取得する
-
-    Args:
-        to_str: 文字列に変換して取得するフラグ
-
-    Returns:
-        日本の現在時間を datetime 型か文字列で返す
-    """
-    datetime_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9), "JST"))     # 日本の現在時刻を取得する
-    if not to_str:
-        return datetime_now
-    return datetime_now.strftime("%Y-%m-%d %H:%M:%S")                                               # 文字列に変換する
-
-
-def compress_hex(hex_str: str) -> str:
-    """16 進数の文字列を圧縮、展開する
-
-    Args:
-        hex_str: 16 進数の値
-
-    Returns:
-        圧縮した文字列
-    """
-    if isinstance(hex_str, str):
-        hex_bytes = hex_str.encode()    # バイナリデータでなければバイナリに変換する
-    elif isinstance(hex_str, bytes):
-        hex_bytes = hex_str
-    else:
-        raise ValueError("使用できない型が使用されました")
-    if len(hex_bytes) % 2 != 0:
-        hex_bytes = b"0" + hex_bytes    # 奇数の場合は先頭に0を追加して偶数にする
-
-    hex_bytes = base64.b16decode(hex_bytes, casefold=True)
-    hex_bytes = base64.b64encode(hex_bytes)
-    return hex_bytes.decode().replace("=", "").replace("+", "-").replace("/", "_")  # パディングを取り除いて安全な文字列に変換する
-
-
-def decompress_hex(hex_str: str) -> str:
-    """圧縮された 16 進数の文字列を展開する
-
-    Args:
-        hex_str: 圧縮された 16 進数の文字列
-
-    Returns:
-        展開した文字列
-    """
-    if not isinstance(hex_str, str):
-        return ""                                           # 文字列以外が渡されたら空白の文字列を返す
-    hex_str = hex_str.replace("-", "+").replace("_", "/")   # 安全な文字列を base64 の記号に復元する
-    hex_str += "=" * (len(hex_str) % 4)                     # 取り除いたパディングを復元する
-    hex_bytes = hex_str.encode()
-
-    hex_bytes = base64.b64decode(hex_bytes)
-    hex_bytes = base64.b16encode(hex_bytes)
-    return hex_bytes.decode().lower()
-
-
-def subprocess_command(command: StrList) -> bytes:
-    """OS のコマンドを実行する
-
-    Args:
-        command: 実行するコマンド
-
-    Returns:
-        実行結果
-    """
-    if platform.system() == "Windows":                  # Windows の環境ではコマンドプロンプトを表示しないようにする
-        si = subprocess.STARTUPINFO()
-        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW   # コマンドプロンプトを表示しない
-        return subprocess.check_output(command, startupinfo=si)
-    else:                                               # STARTUPINFO が存在しない OS があるため処理を分岐する
-        return subprocess.check_output(command)
-
-
-def can_cast(x: Any, cast_type: Callable) -> bool:
-    """【非推奨 : 代替 isinstance】指定された値がキャストできるかどうかを確認する
-
-    Args:
-        x: 確認する値
-        cast_type: チェックするためのキャスト関数
-
-    Returns:
-        キャストできる場合は True
-    """
-    try:
-        cast_type(x)
-    except ValueError:
-        return False
-    return True
-
-
-def get_python_version() -> str:
-    """Python のバージョン情報を文字列で取得する
-
-    Returns:
-        Python のバージョン
-    """
-    return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
