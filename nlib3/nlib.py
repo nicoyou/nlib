@@ -4,7 +4,6 @@ import enum
 import json
 import logging
 import math
-import os
 import platform
 import subprocess
 import sys
@@ -21,6 +20,8 @@ DEFAULT_ENCODING: Final[str] = "utf-8"                      # ファイル IO �
 LOG_DIRECTORY: Final[Path] = Path("./logs")                 # ログを出力する際のディレクトリ
 LOG_PATH: Final[Path] = LOG_DIRECTORY / "lib.log"           # ログのファイルパス
 ERROR_LOG_PATH: Final[Path] = LOG_DIRECTORY / "error.log"   # エラーログのファイルパス
+
+DEFAULT_USER_AGENT: Final[str] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"  # ユーザーエージェント
 
 # 型別名
 Number: TypeAlias = int | float
@@ -247,7 +248,7 @@ class Vector2():
         other = self.to_self_type(other)
         return self.__class__(self.x**other.x, self.y**other.y)
 
-    # 算術演算子 (右辺)
+    # 算術演算子 ( 右辺 )
     def __radd__(self, other):
         other = self.to_self_type(other)
         return self.__class__(other.x + self.x, other.y + self.y)
@@ -492,7 +493,7 @@ class JsonData():
             return False
 
         try:
-            update_nest_dict(json_data, self.keys, self.data)
+            update_nest_dictionary(json_data, self.keys, self.data)
             save_json(self.path, json_data)
             return True
         except Exception as e:
@@ -613,12 +614,6 @@ class JsonData():
         return self.__str__()
 
 
-class StrEnum(str, enum.Enum):
-    """【非推奨 : 代替 enum.StrEnum】str のサブクラスでもある列挙型を作成する基底クラス"""
-    def __str__(self) -> str:
-        return str(self.value)
-
-
 # 汎用処理
 def compress_hex(hex_str: str) -> str:
     """16 進数の文字列を圧縮、展開する
@@ -669,26 +664,26 @@ def get_datetime_now() -> datetime.datetime:
 
 
 @overload
-def get_datetime_now(to_str: bool) -> str:
+def get_datetime_now(as_string: bool) -> str:
     pass
 
 
-def get_datetime_now(to_str: bool = False) -> datetime.datetime | str:
+def get_datetime_now(as_string: bool = False) -> datetime.datetime | str:
     """日本の現在の datetime を取得する
 
     Args:
-        to_str: 文字列として取得するかどうか
+        as_string: 文字列として取得するかどうか
 
     Returns:
         日本の現在時間を datetime 型か文字列で返す
     """
     datetime_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9), "JST"))     # 日本の現在時刻を取得する
-    if not to_str:
-        return datetime_now
-    return datetime_now.strftime("%Y-%m-%d %H:%M:%S")                                               # 文字列に変換する
+    if as_string:
+        return datetime_now.strftime("%Y-%m-%d %H:%M:%S")
+    return datetime_now
 
 
-def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: object) -> bool:
+def update_nest_dictionary(dictionary: dict, keys: object | list | tuple, value: object) -> bool:
     """ネストされた辞書内の特定の値のみを再帰で変更する
 
     Args:
@@ -700,16 +695,42 @@ def update_nest_dict(dictionary: dict, keys: object | list | tuple, value: objec
         再帰せずに更新した場合のみ True、再帰した場合は False
     """
     if type(keys) is not list and type(keys) is not tuple:
-        keys = (keys, )                                         # 渡されがキーがリストでもタプルでもなければタプルに変換する
+        keys = (keys, )                                                 # 渡されがキーがリストでもタプルでもなければタプルに変換する
     if len(keys) == 1:
-        dictionary[keys[0]] = value                             # 最深部に到達したら値を更新する
+        dictionary[keys[0]] = value                                     # 最深部に到達したら値を更新する
         return True
     if keys[0] in dictionary:
-        update_nest_dict(dictionary[keys[0]], keys[1:], value)  # すでにキーがあればその内部から更に探す
+        update_nest_dictionary(dictionary[keys[0]], keys[1:], value)    # すでにキーがあればその内部から更に探す
     else:
-        dictionary[keys[0]] = {}                                # キーが存在しなければ空の辞書を追加する
-        update_nest_dict(dictionary[keys[0]], keys[1:], value)
+        dictionary[keys[0]] = {}                                        # キーが存在しなければ空の辞書を追加する
+        update_nest_dictionary(dictionary[keys[0]], keys[1:], value)
     return False
+
+
+def rename_directory_level(file_path: str | Path, dest_name: str, levels_to_update: int = 0) -> Path:
+    """ファイルパスの指定した階層をリネームする ( 文字列操作 )
+
+    Args:
+        file_path: リネームするファイルパス
+        dest_name: 変更後のディレクトリ名
+        levels_to_update: 変更するディレクトリの深さ ( 一番深いディレクトリが 0 )
+
+    Returns:
+        変換後のファイルパス
+    """
+    new_file_path = Path(file_path)
+    file_name = ""
+    for i in range(levels_to_update):   # 指定された階層分だけパスの右側を避難する
+        if i == 0:
+            file_name = new_file_path.name
+        else:
+            file_name = str(Path(new_file_path.name) / file_name)
+        new_file_path = new_file_path.parent
+
+    new_file_path = new_file_path.parent / dest_name    # 一番深い階層を削除して新しい名前に置き換える
+    if file_name:
+        new_file_path = new_file_path / file_name       # 避難したファイルパスを追加する
+    return new_file_path
 
 
 def get_check_digit(jan_code: int | str) -> int | None:
@@ -793,23 +814,6 @@ def get_error_message(code: LibErrorCode) -> str:
     else:
         get_main_logger().error("登録されていないエラーコードが呼ばれました")
     return "不明なエラーが発生しました"
-
-
-def can_cast(x: Any, cast_type: Callable) -> bool:
-    """【非推奨 : 代替 isinstance】指定された値がキャストできるかどうかを確認する
-
-    Args:
-        x: 確認する値
-        cast_type: チェックするためのキャスト関数
-
-    Returns:
-        キャストできる場合は True
-    """
-    try:
-        cast_type(x)
-    except ValueError:
-        return False
-    return True
 
 
 # 汎用デコレーター
@@ -921,7 +925,7 @@ def save_json(file_path: str | Path, parsed_data: Any, ensure_ascii: bool = Fals
     return
 
 
-def json_dumps(json_data: str | dict, ensure_ascii: bool = False) -> str:
+def format_as_json_string(json_data: str | dict, ensure_ascii: bool = False) -> str:
     """json 文字列か辞書を整形された json 形式の文字列に変換する
 
     Args:
@@ -954,35 +958,6 @@ def read_tail(path: str, n: int, encoding: str | None = None) -> list[str]:
     return lines[-n:]               # 後ろから n 行だけ返す
 
 
-def rename_path(file_path: str, dest_name: str, levels_to_update: int = 0, is_unified_to_slash: bool = False) -> str:
-    """ファイルパスの指定した階層をリネームする
-
-    Args:
-        file_path: リネームするファイルパス
-        dest_name: 変更後のディレクトリ名
-        levels_to_update: 変更するディレクトリの深さ ( 一番深いディレクトリが 0 )
-        is_unified_to_slash: パスの区切り文字をスラッシュのみにするかどうか
-
-    Returns:
-        変換後のファイルパス
-    """
-    file_name = ""
-    for i in range(levels_to_update):   # 指定された階層分だけパスの右側を避難する
-        if i == 0:
-            file_name = os.path.basename(file_path)
-        else:
-            file_name = os.path.join(os.path.basename(file_path), file_name)
-        file_path = os.path.dirname(file_path)
-
-    file_path = os.path.dirname(file_path)              # 一番深い階層を削除する
-    file_path = os.path.join(file_path, dest_name)      # 一番深い階層を新しい名前で追加する
-    if file_name != "":
-        file_path = os.path.join(file_path, file_name)  # 避難したファイルパスを追加する
-    if is_unified_to_slash:
-        file_path = file_path.replace("\\", "/")        # 引数で指定されていれば区切り文字をスラッシュで統一する
-    return file_path
-
-
 # 通信系
 def check_url(url: str) -> bool:
     """リンク先が存在するかどうかを確認する
@@ -991,17 +966,17 @@ def check_url(url: str) -> bool:
         url: 存在を確認する URL
 
     Returns:
-        リンク先に正常にアクセスできた場合は True
+        リンク先に正常にアクセスできたかどうか
     """
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36"}
+        headers = {"User-Agent": DEFAULT_USER_AGENT}
         req = urllib.request.Request(url, None, headers)
         f = urllib.request.urlopen(req)
         f.close()
         time.sleep(0.1)
     except Exception:
-        return False    # 失敗
-    return True         # 成功
+        return False
+    return True
 
 
 def download_file(url: str, dest_path: str, overwrite: bool = True) -> LibErrorCode:
@@ -1015,11 +990,11 @@ def download_file(url: str, dest_path: str, overwrite: bool = True) -> LibErrorC
     Returns:
         ライブラリのエラーコード
     """
-    if not overwrite and os.path.isfile(dest_path):
+    if not overwrite and Path(dest_path).is_file():
         return LibErrorCode.cancel
 
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36"}
+        headers = {"User-Agent": DEFAULT_USER_AGENT}
         req = urllib.request.Request(url, None, headers)
         with urllib.request.urlopen(req) as web_file:
             data = web_file.read()
@@ -1059,7 +1034,7 @@ def download_and_check_file(url: str, dest_path: str, overwrite: bool = True, tr
     if result in [LibErrorCode.cancel, LibErrorCode.argument, LibErrorCode.file_not_found]:     # 既にファイルが存在した場合と引数が間違えている場合は処理を終了する
         return result
     for i in range(trial_count):
-        if not os.path.isfile(dest_path):
+        if not Path(dest_path).is_file():
             get_main_logger().debug(f"ダウンロードに失敗しました、{trial_interval} 秒後に再ダウンロードします ( {i + 1} Fail )")
             time.sleep(trial_interval)
             result = download_file(url, dest_path, overwrite)                                   # 一度目はエラーコードに関わらず失敗すればもう一度ダウンロードする
@@ -1081,18 +1056,18 @@ def program_pause(program_end: bool = True) -> None:
     return
 
 
-def input_while(str_info: str, branch: Callable[[str], bool] = lambda in_str: in_str != "") -> str:
+def input_while(text: str, branch: Callable[[str], bool] = lambda in_str: in_str != "") -> str:
     """条件に一致する文字が入力されるまで再入力を求める入力関数 ( デフォルトでは空白のみキャンセル )
 
     Args:
-        str_info: 入力を求める時に表示する文字列
+        text: 入力を求める時に表示する文字列
         branch: 正常な入力かどうかを判断する関数
 
     Returns:
         入力された文字列
     """
     while True:
-        in_str = input(str_info)
+        in_str = input(text)
         if branch(in_str):
             return in_str
         else:
